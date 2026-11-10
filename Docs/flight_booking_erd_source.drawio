@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net">
   <diagram name="Flight Booking ERD" id="erd1">
-    <mxGraphModel dx="396" dy="227" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1200" math="0" shadow="0">
+    <mxGraphModel dx="572" dy="328" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1200" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -76,7 +76,7 @@
         <mxCell id="TICKET" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="TICKET" vertex="1">
           <mxGeometry height="178" width="230" x="640" y="260" as="geometry" />
         </mxCell>
-        <mxCell id="TICKET_0" parent="TICKET" style="text;strokeColor=none;fillColor=#ffffff;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;rotatable=0;fontSize=11;fontStyle=1;" value="PK  ticket_id : " vertex="1">
+        <mxCell id="TICKET_0" parent="TICKET" style="text;strokeColor=none;fillColor=#ffffff;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;rotatable=0;fontSize=11;fontStyle=1;" value="PK  ticket_id : in" vertex="1">
           <mxGeometry height="30" width="230" y="30" as="geometry" />
         </mxCell>
         <mxCell id="TICKET_1" parent="TICKET" style="text;strokeColor=none;fillColor=#ffffff;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;rotatable=0;fontSize=11;fontStyle=2;" value="FK  flight_id : int" vertex="1">
@@ -112,7 +112,7 @@
         <mxCell id="CUSTOMER_4" parent="CUSTOMER" style="text;strokeColor=none;fillColor=#ffffff;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;rotatable=0;fontSize=11;" value="      date_of_birth : date" vertex="1">
           <mxGeometry height="22" width="230" y="118" as="geometry" />
         </mxCell>
-        <mxCell id="CUSTOMER_5" parent="CUSTOMER" style="text;strokeColor=none;fillColor=#ffffff;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;rotatable=0;fontSize=11;" value="      gender : nvarchar(10)" vertex="1">
+        <mxCell id="CUSTOMER_5" parent="CUSTOMER" style="text;strokeColor=none;fillColor=#ffffff;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;rotatable=0;fontSize=11;" value="      gender : varchar(10)" vertex="1">
           <mxGeometry height="22" width="230" y="140" as="geometry" />
         </mxCell>
         <mxCell id="CUSTOMER_6" parent="CUSTOMER" style="text;strokeColor=none;fillColor=#ffffff;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;rotatable=0;fontSize=11;" value="      id_passport_number : varchar(50) NULL" vertex="1">
@@ -169,7 +169,7 @@
         <mxCell id="BOOKING_7" parent="BOOKING" style="text;strokeColor=none;fillColor=#ffffff;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;rotatable=0;fontSize=11;" value="      discount_amount : decimal  (18,2)" vertex="1">
           <mxGeometry height="22" width="230" y="184" as="geometry" />
         </mxCell>
-        <mxCell id="BOOKING_8" parent="BOOKING" style="text;strokeColor=none;fillColor=#ffffff;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;rotatable=0;fontSize=11;" value="      total_amount : decimal (18,2)" vertex="1">
+        <mxCell id="BOOKING_8" parent="BOOKING" style="text;strokeColor=none;fillColor=#ffffff;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;rotatable=0;fontSize=11;" value="      total_amount : decimal" vertex="1">
           <mxGeometry height="22" width="230" y="206" as="geometry" />
         </mxCell>
         <mxCell id="BOOKING_9" parent="BOOKING" style="text;strokeColor=none;fillColor=#ffffff;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;rotatable=0;fontSize=11;" value="      status : varchar(20)" vertex="1">
