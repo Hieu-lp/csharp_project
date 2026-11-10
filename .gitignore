@@ -7,4 +7,6 @@ obj/
 *.bak
 *.bacpac
 .env
-appsettings.Development.json        
+appsettings.Development.json    
+*.mdf
+*.ldf    
