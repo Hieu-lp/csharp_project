@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FlightBooking.BUS/FlightBooking.BUS.csproj" />
+    <Project Path="src/FlightBooking.DAO/FlightBooking.DAO.csproj" />
+    <Project Path="src/FlightBooking.DTO/FlightBooking.DTO.csproj" />
+    <Project Path="src/FlightBooking.Web/FlightBooking.Web.csproj" />
+    <Project Path="src/FlightBooking.WinForms/FlightBooking.WinForms.csproj" />
+  </Folder>
+</Solution>
