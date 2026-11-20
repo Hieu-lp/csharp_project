@@ -30,7 +30,7 @@ public class CheckoutModel(BookingBUS bus) : PageModel
     {
         try
         {
-            if (AccessKey.Length != 64 || Input.Passengers is null ||
+            if (AccessKey?.Length != 64 || Input.Passengers is null ||
                 HttpContext.Session.GetString("draft:" + AccessKey) != $"{Input.FlightId}:{Input.FareId}:{Input.Passengers.Count}")
                 throw new BookingException("Biểu mẫu đã hết phiên hoặc không hợp lệ. Vui lòng tìm và chọn chuyến lại.");
             if (action == "quote")
