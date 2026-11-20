@@ -1,10 +1,61 @@
 ﻿@page
 @model IndexModel
-@{
-    ViewData["Title"] = "Home page";
+@using FlightBooking.DTO
+@{ ViewData["Title"] = "Tìm chuyến bay"; }
+<section class="hero">
+    <span class="eyebrow">FLIGHT BOOKING · ĐẶT VÉ TRỰC TUYẾN</span>
+    <h1>Chuyến đi mới,<br />bắt đầu từ đây.</h1>
+    <p>Tìm chuyến bay, chọn hạng vé và đặt chỗ cho hành trình của bạn.</p>
+    <div class="hero-note">01 Tìm chuyến <span>→</span> 02 Chọn vé <span>→</span> 03 Xác nhận</div>
+</section>
+<section class="panel search-panel" aria-labelledby="search-title">
+<h2 id="search-title">Bạn muốn bay đến đâu?</h2>
+<form method="get">
+    <input type="hidden" name="Submitted" value="true" />
+    <div class="search-grid">
+        <div><label asp-for="Search.DepartureAirportId">Nơi đi</label>
+        <select asp-for="Search.DepartureAirportId" required><option value="">Chọn sân bay</option>
+            @foreach (var a in Model.Airports) { <option value="@a.AirportId">@a.City · @a.AirportName</option> }
+        </select></div>
+        <div><label asp-for="Search.ArrivalAirportId">Nơi đến</label>
+        <select asp-for="Search.ArrivalAirportId" required><option value="">Chọn sân bay</option>
+            @foreach (var a in Model.Airports) { <option value="@a.AirportId">@a.City · @a.AirportName</option> }
+        </select></div>
+        <div><label asp-for="Search.DepartureDate">Ngày đi</label><input asp-for="Search.DepartureDate" type="date" required /></div>
+        <div><label asp-for="Search.Passengers">Hành khách</label><input asp-for="Search.Passengers" type="number" min="1" max="9" required /></div>
+    </div>
+    <details class="advanced"><summary>Lọc nâng cao theo giá và hạng vé</summary>
+        <div class="search-grid">
+            <div><label asp-for="Search.Operator">So sánh giá</label><select asp-for="Search.Operator">
+                @foreach (var op in new[] { "<=", "<", "=", "<>", ">", ">=" }) { <option value="@op">@op</option> }
+            </select></div>
+            <div><label asp-for="Search.Price">Giá vé mỗi người (VND)</label><input asp-for="Search.Price" type="number" min="0" step="0.01" /></div>
+            <div><label asp-for="Search.ClassName">Tên hạng vé chứa</label><input asp-for="Search.ClassName" maxlength="50" /></div>
+            <div><label asp-for="Search.Join">Kết hợp hai điều kiện</label><select asp-for="Search.Join"><option>AND</option><option>OR</option></select></div>
+        </div>
+        <label class="check"><input asp-for="Search.Not" /> NOT — đảo kết quả lọc nâng cao</label>
+        <p class="muted">Điểm đi, điểm đến, ngày và số khách luôn là điều kiện bắt buộc.</p>
+    </details>
+    <button class="button" type="submit">Tìm chuyến bay <span aria-hidden="true">→</span></button>
+</form>
+</section>
+@if (Model.Error is not null) { <div class="alert" role="alert">@Model.Error</div> }
+@if (Model.Submitted && Model.Error is null)
+{
+    <section aria-labelledby="results-title"><div class="section-heading"><h2 id="results-title">Chuyến bay phù hợp</h2><span>@Model.Offers.Count lựa chọn hạng vé</span></div>
+    @if (Model.Offers.Count == 0) { <div class="panel empty"><h3>Chưa có chuyến phù hợp</h3><p>Thử đổi ngày bay hoặc nới điều kiện lọc.</p></div> }
+    @foreach (FlightOfferDTO offer in Model.Offers)
+    {
+        <article class="panel flight-card">
+            <div><span class="tag">Chuyến #@offer.Flight.FlightId · @offer.Fare.ClassName</span><p class="muted">@offer.Flight.DepartureDate.ToString("dd/MM/yyyy")</p>
+                <div class="route"><div><strong>@offer.Flight.DepartureTime.ToString("HH:mm")</strong><span>@offer.Flight.DepartureCity</span></div><span class="route-line" aria-hidden="true">──── →</span>
+                <div><strong>@offer.Flight.ArrivalTime.ToString("HH:mm")</strong><span>@offer.Flight.ArrivalCity</span></div></div>
+                <p class="muted">Đến ngày @offer.Flight.ArrivalDate.ToString("dd/MM/yyyy") · Hành lý @offer.Fare.BaseBaggageKg kg · Còn @offer.Flight.SeatsAvailable chỗ toàn chuyến</p>
+            </div>
+            <div class="fare"><strong>@offer.Fare.Price.ToString("N0") <small>VND</small></strong><span>/ hành khách</span>
+                <a class="button" asp-page="/Booking/Checkout" asp-route-flightId="@offer.Flight.FlightId" asp-route-fareId="@offer.Fare.FareId" asp-route-quantity="@Model.Search.Passengers">Chọn hạng vé</a></div>
+        </article>
+    }
+    </section>
 }
-
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+<section class="info-grid"><div><h3>Thông tin rõ ràng</h3><p>Giá và hành lý theo từng hạng vé; số chỗ được kiểm tra lại lúc đặt.</p></div><div><h3>Giữ khóa tra cứu</h3><p>Sau khi đặt, lưu mã đơn và khóa riêng để xem hoặc hủy đơn của bạn.</p></div><div><h3>Chưa thanh toán trực tuyến</h3><p>Đơn đặt tạo hóa đơn chưa thanh toán. Liên hệ nhân viên để thanh toán.</p></div></section>

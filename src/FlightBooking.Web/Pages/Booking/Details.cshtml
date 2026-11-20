@@ -1,0 +1,33 @@
+@page "{id:int}"
+@model FlightBooking.Web.Pages.Booking.DetailsModel
+@{ ViewData["Title"] = "Chi tiết đơn đặt"; }
+@if (Model.Error is not null) { <div class="alert" role="alert">@Model.Error</div> }
+@if (Model.Notice is not null) { <div class="notice" role="status">@Model.Notice</div> }
+@if (Model.Booking is { } booking)
+{
+    <div class="page-heading"><span class="eyebrow">ĐƠN ĐẶT #@booking.BookingId</span><h1>@(booking.Status == "CANCELLED" ? "Đơn đặt đã hủy." : "Đã ghi nhận đặt vé.")</h1>
+        <p>@booking.BookingDate.ToString("dd/MM/yyyy HH:mm") · @(booking.Status == "CANCELLED" ? "Đã hủy" : "Đã xác nhận") · Hóa đơn: @(booking.InvoiceStatus == "PAID" ? "Đã thanh toán" : booking.InvoiceStatus == "CANCELLED" ? "Đã hủy" : "Chưa thanh toán")</p></div>
+    <div class="checkout-grid"><div>
+        <section class="panel"><h2>@booking.Flight.DepartureCity → @booking.Flight.ArrivalCity</h2>
+            <p>Chuyến #@booking.FlightId · @booking.Flight.DepartureAirport → @booking.Flight.ArrivalAirport</p>
+            <p>Đi: @booking.Flight.DepartureDate.ToString("dd/MM/yyyy") @booking.Flight.DepartureTime.ToString("HH:mm")<br />Đến: @booking.Flight.ArrivalDate.ToString("dd/MM/yyyy") @booking.Flight.ArrivalTime.ToString("HH:mm")</p>
+            <p>Khách đặt: @booking.CustomerName · @booking.Email · @booking.Phone</p>
+        </section>
+        <section class="panel"><h2>Hành khách & vé</h2><div class="table-scroll"><table><caption class="sr-only">Danh sách hành khách và vé của đơn</caption><thead><tr><th>Hành khách</th><th>Giấy tờ</th><th>Vé / ghế</th><th>Hạng vé</th><th>Giá</th></tr></thead><tbody>
+        @foreach (var detail in booking.Details)
+        {
+            <tr><td>@detail.PassengerFullName</td><td>@detail.PassengerIdCard</td><td>#@detail.TicketId · @detail.SeatNumber<br /><small>@(detail.TicketStatus == "CANCELLED" ? "Đã hủy" : "Đã cấp")</small></td><td>@detail.ClassName</td><td>@detail.Price.ToString("N0") ₫</td></tr>
+        }
+        </tbody></table></div></section>
+        <section class="panel"><h2>Lưu thông tin tra cứu</h2><p>Mã đơn: <strong>@booking.BookingId</strong>. Lưu khóa dưới đây để tra cứu sau khi phiên hiện tại hết hạn.</p>
+            <details><summary>Hiện khóa tra cứu riêng</summary><code class="access-key">@Model.AccessKey</code></details><p class="muted">Ai có khóa đều có thể xem đơn và yêu cầu hủy. Không chia sẻ hoặc đăng ảnh khóa lên nhóm.</p></section>
+    </div><aside><section class="panel summary"><h2>Chi phí đặt vé</h2><dl class="amounts"><dt>@booking.TicketQuantity vé</dt><dd>@booking.Details.Sum(d => d.Price).ToString("N0") ₫</dd><dt>Giảm giá</dt><dd>−@booking.DiscountAmount.ToString("N0") ₫</dd><dt class="total">Tổng tiền</dt><dd class="total">@booking.TotalAmount.ToString("N0") ₫</dd></dl>
+        <p class="muted">Đơn mới chưa được thanh toán. Thanh toán và hoàn tiền do nhân viên xử lý.</p>
+        @if (booking.Status == "CONFIRMED" && booking.InvoiceStatus == "UNPAID")
+        {
+            <details class="cancel"><summary>Yêu cầu hủy đơn</summary><p>Hủy toàn bộ @booking.TicketQuantity vé. Tạm áp dụng: chỉ hủy trước giờ khởi hành, chưa thanh toán.</p>
+                <form method="post" asp-page-handler="Cancel" asp-route-id="@booking.BookingId"><button class="button danger full" type="submit">Xác nhận hủy toàn bộ đơn</button></form></details>
+        }
+        <a class="button secondary full" asp-page="/Index">Tìm chuyến mới</a>
+    </section></aside></div>
+}

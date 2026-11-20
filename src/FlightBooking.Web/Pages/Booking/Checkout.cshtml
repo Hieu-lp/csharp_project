@@ -1,0 +1,54 @@
+@page
+@model FlightBooking.Web.Pages.Booking.CheckoutModel
+@{ ViewData["Title"] = "Thông tin đặt vé"; }
+<a class="back" asp-page="/Index">← Tìm chuyến khác</a>
+<div class="page-heading"><span class="eyebrow">BƯỚC 02 · THÔNG TIN ĐẶT VÉ</span><h1>Chuẩn bị cho hành trình.</h1><p>Nhập thông tin đúng giấy tờ tùy thân của từng hành khách.</p></div>
+@if (Model.Error is not null) { <div class="alert" role="alert">@Model.Error</div> }
+@if (Model.Input.Passengers.Count is >= 1 and <= 9)
+{
+<form method="post" class="checkout-grid">
+    <input asp-for="Input.FlightId" type="hidden" /><input asp-for="Input.FareId" type="hidden" />
+    <input asp-for="Input.ExpectedTotal" type="hidden" /><input asp-for="AccessKey" type="hidden" />
+    <div>
+        <div asp-validation-summary="All" class="validation-summary" role="alert"></div>
+        <section class="panel"><h2>Khách đặt vé</h2><p class="muted">Thông tin liên hệ cho đơn đặt này.</p>
+            <div class="form-grid">
+                <div class="wide"><label asp-for="Input.Customer.FullName">Họ và tên</label><input asp-for="Input.Customer.FullName" autocomplete="name" required /><span asp-validation-for="Input.Customer.FullName"></span></div>
+                <div><label asp-for="Input.Customer.Email">Email</label><input asp-for="Input.Customer.Email" type="email" autocomplete="email" required /><span asp-validation-for="Input.Customer.Email"></span></div>
+                <div><label asp-for="Input.Customer.Phone">Số điện thoại</label><input asp-for="Input.Customer.Phone" type="tel" autocomplete="tel" required /><span asp-validation-for="Input.Customer.Phone"></span></div>
+                <div><label asp-for="Input.Customer.DateOfBirth">Ngày sinh</label><input asp-for="Input.Customer.DateOfBirth" type="date" required /><span asp-validation-for="Input.Customer.DateOfBirth"></span></div>
+                <div><label asp-for="Input.Customer.Gender">Giới tính</label><select asp-for="Input.Customer.Gender"><option>Khác</option><option>Nam</option><option>Nữ</option></select></div>
+                <div class="wide"><label asp-for="Input.Customer.IdPassportNumber">Giấy tờ khách đặt (không bắt buộc)</label><input asp-for="Input.Customer.IdPassportNumber" maxlength="50" /><span asp-validation-for="Input.Customer.IdPassportNumber"></span></div>
+            </div>
+        </section>
+        <section class="panel"><h2>Hành khách</h2>
+        @for (var i = 0; i < Model.Input.Passengers.Count; i++)
+        {
+            <fieldset><legend>Hành khách @(i + 1)</legend><div class="form-grid">
+                <div><label asp-for="Input.Passengers[i].FullName">Họ và tên theo giấy tờ</label><input asp-for="Input.Passengers[i].FullName" required /><span asp-validation-for="Input.Passengers[i].FullName"></span></div>
+                <div><label asp-for="Input.Passengers[i].IdCard">CCCD / hộ chiếu</label><input asp-for="Input.Passengers[i].IdCard" maxlength="50" required /><span asp-validation-for="Input.Passengers[i].IdCard"></span></div>
+            </div></fieldset>
+        }
+        <p class="muted">Ghế được tự động cấp khi xác nhận; chưa hỗ trợ chọn vị trí trên sơ đồ máy bay.</p>
+        </section>
+    </div>
+    <aside><section class="panel summary"><h2>Hành trình của bạn</h2>
+        @if (Model.Quote is { } quote)
+        {
+            <span class="tag">Chuyến #@quote.Flight.FlightId · @quote.Fare.ClassName</span>
+            <h3>@quote.Flight.DepartureCity → @quote.Flight.ArrivalCity</h3>
+            <p>@quote.Flight.DepartureAirport<br />@quote.Flight.DepartureDate.ToString("dd/MM/yyyy") · @quote.Flight.DepartureTime.ToString("HH:mm")</p>
+            <p>@quote.Flight.ArrivalAirport<br />@quote.Flight.ArrivalDate.ToString("dd/MM/yyyy") · @quote.Flight.ArrivalTime.ToString("HH:mm")</p>
+            <p class="muted">@quote.Fare.BaseBaggageKg kg hành lý / khách · Còn @quote.Flight.SeatsAvailable chỗ toàn chuyến</p>
+            <hr /><dl class="amounts"><dt>@quote.Quantity khách × @quote.Fare.Price.ToString("N0")</dt><dd>@quote.Subtotal.ToString("N0") ₫</dd>
+                <dt>Giảm giá</dt><dd>−@quote.DiscountAmount.ToString("N0") ₫</dd><dt>Thuế bổ sung</dt><dd>0 ₫</dd>
+                <dt class="total">Tổng tiền</dt><dd class="total">@quote.TotalAmount.ToString("N0") ₫</dd></dl>
+        }
+        <label asp-for="Input.DiscountCode">Mã giảm giá</label><input asp-for="Input.DiscountCode" maxlength="50" /><span asp-validation-for="Input.DiscountCode"></span>
+        <button class="button secondary full" type="submit" name="action" value="quote" formnovalidate>Tính lại giá / áp mã</button>
+        <p class="muted">Nếu đổi mã, hãy tính lại giá trước khi xác nhận. Giá và số chỗ được kiểm tra lần cuối trên máy chủ.</p>
+        <button class="button full" type="submit" name="action" value="book">Xác nhận đặt vé</button>
+        <p class="muted">Chưa thanh toán. Tạm áp dụng: chỉ hủy online đơn chưa thanh toán, trước giờ khởi hành.</p>
+    </section></aside>
+</form>
+}
