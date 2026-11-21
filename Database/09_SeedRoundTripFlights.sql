@@ -1,4 +1,6 @@
 ﻿/* Supplemental LOCAL demo flights, Nov 2026 .. Jan 2027.
+   Legacy backfill for databases created before 04_SeedDemoData.sql included
+   these flights. Fresh databases already receive them from seed 04.
    Run against the database selected by the caller (no USE, no schema changes).
    Inserts only AIRPORT-linked FLIGHT and FARE_CLASS rows. No booking/customer/invoice.
    Reruns match a full route + departure/arrival date/time signature; existing

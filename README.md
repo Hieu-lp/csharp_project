@@ -229,3 +229,16 @@ lại giá; Enter ở ô mã áp mã, không quay về chọn chuyến hoặc t�
 và cả hai lượt khi lỗi. Build 0 lỗi; 82 kiểm tra C#, 12 HTTP và JavaScript đạt;
 đã kiểm tra Enter trên trình duyệt, lượt dùng mã SQL không tăng khi xem giá.
 Chi tiết và giới hạn kiểm tra ở cuối [báo cáo Booking](Docs/Thinh-Booking.md).
+
+## Seed khứ hồi đã gộp vào dữ liệu gốc (21/11/2026)
+
+`Database/04_SeedDemoData.sql` đã bao gồm 11 cặp đi–về (22 chuyến, 44 hạng vé)
+trong tháng 11/2026, 12/2026 và 01/2027, cùng sân bay Đà Nẵng cần cho các tuyến này.
+Database mới chạy 01 → 02 → 03 → 04 là có đủ các cặp trên; không cần chạy 09.
+Sau 04 có 23 chuyến, 45 hạng vé và 3 sân bay. Seed mở rộng 07 chỉ thêm sân bay
+còn thiếu; sau 04 + 07 có 43 chuyến, 85 hạng vé và 8 sân bay.
+
+04 và 07 vẫn chỉ chạy một lần trên database mới/đúng bước, không chạy lại trên DB
+đã có dữ liệu. `09_SeedRoundTripFlights.sql` được giữ làm bản bổ sung cho DB dùng
+seed cũ; file này kiểm tra trùng trước khi thêm. ID chuyến/hạng vé được sinh tự động,
+không dùng các ID ghi nhận từ DB cũ để giả định ID trên máy mới.

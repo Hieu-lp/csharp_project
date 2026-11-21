@@ -120,3 +120,15 @@ website kết nối SQL đạt 14 xác nhận: một chiều/khứ hồi 1→2�
 trước khi chọn chuyến, đúng số khối và Quantity, tính lại giá, giữ hành khách/người đặt.
 Không tạo Booking hoặc thay đổi dữ liệu SQL. Chương trình tái hiện:
 `tests/FlightBooking.Checks/passenger-count.http.ps1` (dùng seed 09, ngày 24–27/11/2026).
+
+## Cập nhật: dữ liệu đã có trong seed gốc (21/11/2026)
+
+11 cặp chuyến ở bảng trên đã được đưa vào `Database/04_SeedDemoData.sql`.
+Database mới chỉ cần chạy 01 → 02 → 03 → 04 để có các cặp khứ hồi; 07 là dữ liệu
+mở rộng tùy chọn và không thêm trùng sân bay Đà Nẵng đã có từ 04.
+
+Số lượng dự kiến sau 04: 3 AIRPORT, 23 FLIGHT, 45 FARE_CLASS; sau 04 + 07:
+8 AIRPORT, 43 FLIGHT, 85 FARE_CLASS. Booking/vé/hóa đơn mẫu gốc vẫn giữ nguyên.
+09 chỉ còn là bản bổ sung cho những DB đã chạy seed cũ, không cần chạy cho DB mới.
+Không chạy lại 04/07 trên DB đã có dữ liệu. Các ID và kết quả chạy SQL ở phần trên
+là lịch sử của lần chạy seed 09, không phải ID cố định của bản seed gốc mới.

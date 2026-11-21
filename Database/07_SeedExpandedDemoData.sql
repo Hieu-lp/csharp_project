@@ -27,14 +27,18 @@ BEGIN TRY
     IF EXISTS (SELECT 1 FROM dbo.DISCOUNT_CODE WHERE code = 'EXPAND5')
        THROW 52003, N'Du lieu mo rong da ton tai. Khong chay lai file 07.', 1;
 
-    /* Extra airports: existing SGN/HAN remain in place. */
-    INSERT INTO dbo.AIRPORT(airport_name,city) VALUES
+    /* Add only missing airports; seed 04 now also provides Da Nang. */
+    INSERT INTO dbo.AIRPORT(airport_name,city)
+    SELECT a.airport_name,a.city
+    FROM (VALUES
         (N'San bay Da Nang',N'Da Nang'),
         (N'San bay Cam Ranh',N'Khanh Hoa'),
         (N'San bay Phu Quoc',N'Kien Giang'),
         (N'San bay Cat Bi',N'Hai Phong'),
         (N'San bay Phu Bai',N'Hue'),
-        (N'San bay Lien Khuong',N'Lam Dong');
+        (N'San bay Lien Khuong',N'Lam Dong')) a(airport_name,city)
+    WHERE NOT EXISTS (SELECT 1 FROM dbo.AIRPORT existing
+        WHERE existing.airport_name=a.airport_name AND existing.city=a.city);
 
     /* 24 fictional customers, all identifiable by reserved demo email pattern. */
     DECLARE @i INT = 1;
@@ -268,7 +272,7 @@ BEGIN TRY
     ) THROW 52009, N'So hanh khach khong khop BOOKING.ticket_quantity.',1;
 
     COMMIT TRANSACTION;
-    PRINT N'Thanh cong: them 6 san bay, 24 khach, 6 nhan vien, 5 ma giam gia, 20 chuyen bay, 40 hang ve, 80 booking va 140 ve.';
+    PRINT N'Thanh cong: them cac san bay con thieu, 24 khach, 6 nhan vien, 5 ma giam gia, 20 chuyen bay, 40 hang ve, 80 booking va 140 ve.';
     PRINT N'Da kiem tra so ve, doanh thu va so hanh khach tren toan database.';
 END TRY
 BEGIN CATCH
