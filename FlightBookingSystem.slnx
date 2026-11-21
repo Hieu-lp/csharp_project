@@ -6,4 +6,7 @@
     <Project Path="src/FlightBooking.Web/FlightBooking.Web.csproj" />
     <Project Path="src/FlightBooking.WinForms/FlightBooking.WinForms.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FlightBooking.ManagementChecks/FlightBooking.ManagementChecks.csproj" />
+  </Folder>
 </Solution>
