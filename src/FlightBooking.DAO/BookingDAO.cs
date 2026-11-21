@@ -89,13 +89,13 @@ public sealed class BookingData(SqlConnection connection, SqlTransaction? transa
         return result;
     }
 
-    private const string FlightColumns = """
-        SELECT f.flight_id,f.departure_airport_id,f.arrival_airport_id,
-            a.city,z.city,a.airport_name,z.airport_name,
-            f.departure_date,f.departure_time,f.arrival_date,f.arrival_time,
-            f.total_seats,f.seats_available,f.status
-        FROM dbo.FLIGHT f
+    private const string FlightFields = """
+        f.flight_id,f.departure_airport_id,f.arrival_airport_id,
+        a.city,z.city,a.airport_name,z.airport_name,
+        f.departure_date,f.departure_time,f.arrival_date,f.arrival_time,
+        f.total_seats,f.seats_available,f.status
         """;
+    private const string FlightColumns = "SELECT " + FlightFields + " FROM dbo.FLIGHT f ";
     private const string AirportJoins = """
         JOIN dbo.AIRPORT a ON a.airport_id=f.departure_airport_id
         JOIN dbo.AIRPORT z ON z.airport_id=f.arrival_airport_id
@@ -118,6 +118,36 @@ public sealed class BookingData(SqlConnection connection, SqlTransaction? transa
         var result = new List<FlightDTO>();
         while (reader.Read()) result.Add(MapFlight(reader));
         return result;
+    }
+
+    public List<string> FareClassNames()
+    {
+        using var command = Command("SELECT DISTINCT class_name FROM dbo.FARE_CLASS ORDER BY class_name");
+        using var reader = command.ExecuteReader();
+        var names = new List<string>();
+        while (reader.Read()) names.Add(reader.GetString(0));
+        return names;
+    }
+
+    public List<FlightOfferDTO> CheapestFlights(DateTime now)
+    {
+        using var command = Command("SELECT TOP (4) " + FlightFields + """
+            , cheapest.fare_id,cheapest.class_name,cheapest.price,cheapest.base_baggage_kg
+            FROM dbo.FLIGHT f
+            """ + " " + AirportJoins + """
+             CROSS APPLY (
+                SELECT TOP (1) fc.fare_id,fc.class_name,fc.price,fc.base_baggage_kg
+                FROM dbo.FARE_CLASS fc WHERE fc.flight_id=f.flight_id
+                ORDER BY fc.price,fc.fare_id
+             ) cheapest
+             WHERE f.status='SCHEDULED' AND f.seats_available>0
+               AND (f.departure_date>@date OR (f.departure_date=@date AND f.departure_time>@time))
+             ORDER BY cheapest.price,f.departure_date,f.departure_time,f.flight_id,cheapest.fare_id
+            """, ("@date", DateOnly.FromDateTime(now)), ("@time", now.TimeOfDay));
+        using var r = command.ExecuteReader();
+        var offers = new List<FlightOfferDTO>();
+        while (r.Read()) offers.Add(new(MapFlight(r), new(r.GetInt32(14), r.GetInt32(0), r.GetString(15), r.GetDecimal(16), r.GetInt32(17))));
+        return offers;
     }
 
     public FlightDTO Flight(int id, bool locked = false)

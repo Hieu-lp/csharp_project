@@ -9,9 +9,14 @@ public sealed record FlightDTO(int FlightId, int DepartureAirportId, int Arrival
     int TotalSeats, int SeatsAvailable, string Status)
 {
     public DateTime DepartsAt => DepartureDate.ToDateTime(DepartureTime);
+    public DateTime ArrivesAt => ArrivalDate.ToDateTime(ArrivalTime);
 }
 public sealed record FareClassDTO(int FareId, int FlightId, string ClassName, decimal Price, int BaseBaggageKg);
 public sealed record FlightOfferDTO(FlightDTO Flight, FareClassDTO Fare);
+public sealed record FlightSelectionDTO(BookingQuoteDTO Quote)
+{
+    public bool HasSeats => Quote.Flight.SeatsAvailable >= Quote.Quantity;
+}
 public sealed record DiscountCodeDTO(int DiscountId, string Code, string Type, decimal Value,
     decimal MinOrderAmount, decimal? MaxDiscountAmount, DateTime StartDate, DateTime EndDate,
     int? UsageLimit, int UsedCount, string Status);
@@ -27,9 +32,10 @@ public sealed class CustomerInput
     [Required(ErrorMessage = "Nhập ngày sinh khách đặt."), DataType(DataType.Date)]
     public DateOnly? DateOfBirth { get; set; }
     [Required(ErrorMessage = "Chọn giới tính.")]
-    public string Gender { get; set; } = "Khác";
-    [StringLength(50), RegularExpression(@"[A-Za-z0-9-]*", ErrorMessage = "Giấy tờ chỉ dùng chữ Latin, số và dấu -.")]
-    public string? IdPassportNumber { get; set; }
+    public string Gender { get; set; } = "";
+    private string? idPassportNumber;
+    [Required(ErrorMessage = "Nhập CCCD hoặc hộ chiếu người đặt."), StringLength(50, ErrorMessage = "Giấy tờ tối đa 50 ký tự."), RegularExpression(@"[A-Za-z0-9-]+", ErrorMessage = "Giấy tờ chỉ dùng chữ Latin, số và dấu -.")]
+    public string? IdPassportNumber { get => idPassportNumber; set => idPassportNumber = value?.Trim(); }
 }
 
 public sealed class PassengerInput
@@ -42,6 +48,11 @@ public sealed class PassengerInput
 
 public sealed class BookingRequest
 {
+    public int Quantity { get; set; } = 1;
+    public string TripType { get; set; } = "OneWay";
+    public DateOnly? ReturnDate { get; set; }
+    public int? ReturnFlightId { get; set; }
+    public int? ReturnFareId { get; set; }
     public int FlightId { get; set; }
     public int FareId { get; set; }
     public CustomerInput Customer { get; set; } = new();
@@ -53,6 +64,10 @@ public sealed class BookingRequest
 
 public sealed record BookingQuoteDTO(FlightDTO Flight, FareClassDTO Fare, int Quantity,
     decimal Subtotal, decimal DiscountAmount, decimal TotalAmount, int? DiscountId);
+public sealed record JourneyQuoteDTO(BookingQuoteDTO Outbound, BookingQuoteDTO? Return)
+{
+    public decimal TotalAmount => Outbound.TotalAmount + (Return?.TotalAmount ?? 0);
+}
 public sealed record BookingDetailDTO(int BookingDetailId, int TicketId, string PassengerFullName,
     string PassengerIdCard, decimal Price, string SeatNumber, string ClassName, string TicketStatus);
 public sealed record BookingDTO(int BookingId, int CustomerId, int FlightId, int? DiscountId,
@@ -63,9 +78,15 @@ public sealed class BookingException(string message) : Exception(message);
 
 public sealed class FlightSearch
 {
+    public decimal? MinPrice { get; set; }
+    public decimal? MaxPrice { get; set; }
+    public string? FareClassName { get; set; }
+    public string TripType { get; set; } = "OneWay";
+    public DateOnly? ReturnDate { get; set; }
     public int DepartureAirportId { get; set; }
     public int ArrivalAirportId { get; set; }
     public DateOnly DepartureDate { get; set; }
+    public DateOnly? ArrivalDate { get; set; }
     public int Passengers { get; set; } = 1;
     public string Operator { get; set; } = "<=";
     public decimal? Price { get; set; }

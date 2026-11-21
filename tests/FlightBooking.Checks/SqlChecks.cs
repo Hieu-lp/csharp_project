@@ -52,8 +52,8 @@ internal static class SqlChecks
         }
         BookingRequest Request((int Flight, int Fare) f, int quantity = 1, string? code = null) => new()
         {
-            FlightId = f.Flight, FareId = f.Fare, DiscountCode = code, ExpectedTotal = quantity * 100000 - (code is null ? 0 : 10000),
-            Customer = new() { FullName = "Khách kiểm thử", Email = label + "@example.test", Phone = "0900000000", DateOfBirth = new(2000,1,1), Gender = "Khác" },
+            FlightId = f.Flight, FareId = f.Fare, Quantity = quantity, DiscountCode = code, ExpectedTotal = quantity * 100000 - (code is null ? 0 : 10000),
+            Customer = new() { FullName = "Khách kiểm thử", Email = label + "@example.test", Phone = "0900000000", DateOfBirth = new(2000,1,1), Gender = "Khác", IdPassportNumber = "TEST-BOOKER-001" },
             Passengers = Enumerable.Range(1, quantity).Select(i => new PassengerInput { FullName = "Hành khách " + i, IdCard = label + "-" + i }).ToList()
         };
         void Reject(Action action, string name)
@@ -130,6 +130,37 @@ internal static class SqlChecks
         check(seatsRace.Count(v => v) == 1 && Scalar("SELECT COUNT(*) FROM dbo.TICKET WHERE flight_id=@id AND status='ISSUED'", ("@id", lastSeat.Flight)) == 1, "SQL concurrent last-seat race");
         var discountRace = await Task.WhenAll(TryBook(Fixture(1), code), TryBook(Fixture(1), code));
         check(discountRace.Count(v => v) == 1 && Scalar("SELECT used_count FROM dbo.DISCOUNT_CODE WHERE discount_id=@id", ("@id", discountId)) == 1, "SQL concurrent last-discount race");
+        (int Flight, int Fare) ReturnFixture(int seats)
+        {
+            var result = Fixture(seats);
+            Scalar("UPDATE dbo.FLIGHT SET departure_airport_id=@arrival,arrival_airport_id=@departure,departure_time='12:00',arrival_time='14:00' WHERE flight_id=@id; SELECT 1",
+                ("@arrival", arrival), ("@departure", departure), ("@id", result.Flight));
+            return result;
+        }
+        var outLeg = Fixture(3); var backLeg = ReturnFixture(3);
+        var roundTrip = Request(outLeg, 2);
+        roundTrip.TripType = "RoundTrip"; roundTrip.ReturnDate = DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(3));
+        roundTrip.ReturnFlightId = backLeg.Flight; roundTrip.ReturnFareId = backLeg.Fare; roundTrip.ExpectedTotal = 400000;
+        var roundKey = BookingBUS.NewAccessKey(); var roundId = bus.Create(roundTrip, roundKey);
+        var journey = bus.GetJourney(roundId, roundKey);
+        check(journey.Count == 2 && journey.All(b => b.Details.Count == 2) && journey.Sum(b => b.TotalAmount) == 400000,
+            "SQL round trip has two bookings and two passengers per leg");
+        check(journey[0].Details.Select(d => d.PassengerIdCard).SequenceEqual(journey[1].Details.Select(d => d.PassengerIdCard)), "SQL same passenger list on both legs");
+        check(bus.Create(roundTrip, roundKey) == roundId && bus.GetJourney(roundId, roundKey).Count == 2, "SQL round-trip retry creates no extra leg");
+        bus.CancelJourney(roundId, roundKey); bus.CancelJourney(roundId, roundKey);
+        check(bus.GetJourney(roundId, roundKey).All(b => b.Status == "CANCELLED") &&
+            Scalar("SELECT seats_available FROM dbo.FLIGHT WHERE flight_id=@id", ("@id", outLeg.Flight)) == 3 &&
+            Scalar("SELECT seats_available FROM dbo.FLIGHT WHERE flight_id=@id", ("@id", backLeg.Flight)) == 3, "SQL cancel journey twice restores both legs once");
+        var rollbackOut = Fixture(2); var rollbackBack = ReturnFixture(2);
+        // A deliberately inconsistent return counter fails after the outbound writes.
+        Scalar("UPDATE dbo.FLIGHT SET tickets_sold=1,seats_available=1 WHERE flight_id=@id; SELECT 1", ("@id", rollbackBack.Flight));
+        var brokenTrip = Request(rollbackOut); brokenTrip.TripType = "RoundTrip"; brokenTrip.ReturnDate = roundTrip.ReturnDate;
+        brokenTrip.ReturnFlightId = rollbackBack.Flight; brokenTrip.ReturnFareId = rollbackBack.Fare; brokenTrip.ExpectedTotal = 200000;
+        var beforeJourney = Scalar(totalsSql);
+        Reject(() => bus.Create(brokenTrip, BookingBUS.NewAccessKey()), "SQL return-leg failure rejects entire journey");
+        check(Scalar(totalsSql) == beforeJourney && Scalar("SELECT seats_available FROM dbo.FLIGHT WHERE flight_id=@id", ("@id", rollbackOut.Flight)) == 2,
+            "SQL second-leg failure rolls back outbound rows and seats");
+        Scalar("UPDATE dbo.FLIGHT SET tickets_sold=0,seats_available=2 WHERE flight_id=@id; SELECT 1", ("@id", rollbackBack.Flight));
         Console.WriteLine("SQL fixtures retained in the dedicated test database: " + label);
     }
 }

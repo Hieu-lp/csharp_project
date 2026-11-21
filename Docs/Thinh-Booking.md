@@ -186,3 +186,128 @@ Khi Thịnh xác nhận bắt đầu giai đoạn 2: tái sử dụng chọn l�
 review đề xuất 08, SQL và ERD; DTO/DAO/BUS AIRPORT/FLIGHT/FARE_CLASS, WinForms
 CRUD/tìm kiếm ArrayList, validation/FK/ngày giờ/giá/hành lý/chỗ, không sửa tùy ý counters.
 Không merge toàn bộ nhánh Web sang và không tự merge PR vào develop.
+
+## Cập nhật hành khách và khứ hồi — 21/11/2026
+
+Phần này thay thế các giới hạn một chuyến/một Booking của phiên bản trước.
+
+### Đã sửa
+
+- `FlightSearch`: loại hành trình và ngày về; một chiều xóa ngày về khỏi xử lý.
+- Trang Index tìm lượt đi, rồi đảo sân bay để tìm lượt về. Chuyến về phải khởi hành
+  sau khi chuyến đi hạ cánh, kể cả bay qua đêm; không chỉ so sánh ngày.
+- Checkout giữ đúng Quantity, bind `Input.Passengers[0..n-1]` riêng từng người.
+  Thêm nút lưu thông tin/quay lại chọn chuyến và cập nhật số người 1–9.
+- Nháp được lưu server-side trong session, gắn với DraftId riêng cho mỗi luồng.
+  Quay lại qua nút lưu hoặc mở lại cùng nháp giữ khách đặt và từng hành khách;
+  thay đổi số người giữ các phần tử còn lại. Không lưu giấy tờ vào URL hoặc localStorage.
+  Nháp hết hạn sau một giờ không hoạt động hoặc khi tiến trình mất session bộ nhớ.
+- BUS đối chiếu Quantity với số bản ghi hành khách, kiểm tra bắt buộc và trùng giấy tờ.
+  Đổi hành trình/số người cấp khóa yêu cầu mới; gửi lại cùng yêu cầu trả cùng Booking.
+- Trang kết quả hiển thị cả hai Booking, vé/ghế/hành khách và giá từng lượt/tổng tiền.
+  Hủy hành trình kiểm tra cả hai lượt rồi hủy trong cùng transaction; hủy lặp không hoàn thêm.
+
+### Ánh xạ biểu mẫu
+
+| Trường | Nơi lưu |
+|---|---|
+| Họ tên khách đặt | CUSTOMER.full_name |
+| Email, điện thoại, ngày sinh, giấy tờ khách đặt | CUSTOMER.email, phone, date_of_birth, id_passport_number |
+| Giới tính khách đặt | CUSTOMER.gender; nhãn Nữ gửi giá trị Nu theo seed 07, Nam và Khác giữ theo seed 04/07; chấp nhận Nữ cũ và chuẩn hóa thành Nu |
+| Tên mỗi hành khách | BOOKING_DETAIL.passenger_full_name; nhập họ tên đầy đủ, không tách Họ/Tên |
+| Giấy tờ mỗi hành khách | BOOKING_DETAIL.passenger_id_card |
+| Vé, ghế, hạng và chuyến mỗi lượt | TICKET.ticket_id, seat_number, fare_id, flight_id |
+| Số người, chuyến, tổng tiền mỗi lượt | BOOKING.ticket_quantity, flight_id, total_amount |
+| Ngày giờ bay | FLIGHT giữ departure_date/time và arrival_date/time riêng |
+
+CUSTOMER chỉ là khách đặt, không tự tạo một CUSTOMER cho mỗi người đi vé.
+BOOKING_DETAIL và ERD hiện không có giới tính hành khách. Do đó **không thêm ô
+nhập giới tính hành khách rồi bỏ dữ liệu khi lưu** và không sao chép giới tính
+khách đặt cho họ. Nếu nhóm cần trường này, phương án cần Hiếu duyệt trước là
+thêm `passenger_gender NVARCHAR(10) NULL` vào BOOKING_DETAIL, thống nhất bộ giá trị
+và constraint, để lịch sử NULL thay vì tự đoán giới tính, rồi cập nhật DTO/DAO/UI.
+Chưa tạo/chạy migration cho phương án đó. CUSTOMER hiện không có CHECK giới tính;
+seed 07 dùng Nu trong khi giao diện cũ dùng Nữ; đây là điểm cần thống nhất toàn nhóm.
+
+### Cách lưu khứ hồi
+
+Không gộp hai chuyến vào BOOKING.flight_id. Mỗi hành trình khứ hồi tạo:
+
+- Một CUSTOMER liên hệ, dùng chung customer_id cho hai lượt.
+- Hai BOOKING, mỗi bản ghi đúng một flight_id và đúng Quantity.
+- Mỗi Booking có Quantity TICKET, BOOKING_DETAIL và một INVOICE UNPAID cùng INVOICE_DETAIL.
+- Hai bản ghi trong bảng kỹ thuật BOOKING_WEB_REQUEST đã đề xuất ở script 08.
+  Khóa lượt về dẫn xuất SHA-256 từ khóa bí mật lượt đi với tiền tố `return:`;
+  mỗi khóa lại được hash trước khi lưu. Không thêm cột/bảng mới để liên kết hai lượt.
+  Dùng mã Booking lượt đi + khóa tra cứu gốc để mở lại toàn hành trình sau restart.
+
+BUS dùng đúng một `BookingDAO.Write`/SqlTransaction Serializable cho cả hai lượt,
+khóa FLIGHT theo flight_id tăng dần, tính lại giá và kiểm tra ghế cả hai lượt.
+Lỗi ở lượt về rollback luôn dữ liệu lượt đi. Không cộng doanh thu khi hóa đơn UNPAID.
+Mã giảm giá áp dụng trên giá lượt đi, dùng một lượt mã cho cả hành trình; lượt về
+không áp lại mã. Cách áp mã được hiển thị tại checkout, cần nhóm thống nhất chính sách.
+
+Không sửa schema hoặc dữ liệu FlightBookingDB. Script 08 vẫn cần được nhóm duyệt
+và áp dụng để lưu khóa chống lặp/tra cứu; đây là phụ thuộc đã có của phiên bản trước.
+Những người quản lý hóa đơn/thanh toán tiếp tục cần phối hợp trạng thái từng Booking.
+
+### Kiểm chứng bản cập nhật
+
+- Build dùng `--artifacts-path tmp/journey-build -m:1 --disable-build-servers
+  -p:UseSharedCompilation=false`, tránh khóa DLL của website đang chạy.
+- Build thành công, 0 lỗi; 5 cảnh báo NU1900 do không truy cập dịch vụ kiểm tra
+  lỗ hổng gói NuGet. Không tắt audit trong cấu hình dự án.
+- 48 kiểm tra C# đạt, gồm độc lập dữ liệu 1/2/3 người, tăng/giảm giữ người còn lại,
+  lệch số vé, một chiều loại giá trị lượt về, ngày/giờ và tuyến khứ hồi, tổng hai lượt.
+- 10 kiểm tra HTTP đạt trên localhost (không kết nối SQL): số fieldset 1/2/3,
+  tăng/giảm số người, khôi phục nháp bằng GET, giữ dữ liệu khi validation lỗi,
+  server chặn ngày về sai và HTML vô hiệu hóa ngày về khi một chiều.
+- `node tests/FlightBooking.Checks/search-form.checks.cjs` đạt: chạy script thật
+  với DOM kiểm thử, xác minh ẩn/hiện, required/disabled, xóa ngày về khi chuyển một
+  chiều, ngày sai và đổi sân bay. Đây không phải kiểm tra trực quan trình duyệt.
+- Công cụ trình duyệt không mở được; chưa kiểm tra trực quan bố cục bản này.
+- Đã đọc kết nối SQL thật RNR-LAPTOP và xác nhận FlightBookingDB chưa có bảng 08;
+  chưa có FlightBooking_BookingTests. Yêu cầu tạo/chạy database test bị từ chối,
+  nên **chưa chạy kiểm tra ghi SQL, luồng đặt hai lượt hoặc rollback SQL của bản này**.
+  Bộ `--sql` đã bổ sung ca hai Booking/cùng hành khách, retry, hủy hai lượt lặp,
+  lỗi lượt về sau khi ghi lượt đi và rollback, nhưng chưa được thực thi.
+
+Các file chính: BookingModels.cs, BookingBUS.cs, BookingDraft.cs, Index.cshtml(.cs),
+Checkout.cshtml(.cs), Details.cshtml(.cs), search.js, site.css và tests/FlightBooking.Checks.
+Không làm phần Hiếu, không tự merge PR. Thay đổi có sẵn của người dùng trong
+Database/02_CreateTables.sql được giữ nguyên.
+
+## Ràng buộc người đặt, áp lại mã và Enter (21/11/2026)
+
+- Người đặt phải đã qua sinh nhật lần 18 theo ngày Việt Nam; đúng ngày sinh nhật
+  thứ 18 vẫn bị từ chối. BUS dùng ngày đầy đủ và xử lý ngày 29/2; form có min/max
+  tương ứng và lỗi dưới ô ngày sinh. Không áp tuổi này cho hành khách.
+- CustomerInput bắt buộc CCCD/hộ chiếu riêng, trim, tối đa 50 ký tự, giữ quy tắc
+  chữ Latin/số/dấu gạch ngang. DAO vẫn ghi CUSTOMER.id_passport_number. Không sửa
+  schema, dữ liệu cũ hoặc quy tắc đọc các bản ghi cũ.
+- BookingDraft lưu dấu trạng thái mã đã áp theo mã chuẩn hóa, lựa chọn hai lượt,
+  số người và báo giá. Mỗi lần xem giá đều đọc và tính lại phía server; áp lại
+  cùng mã/cùng giá thông báo “Mã giảm giá này đã được áp dụng”. Đổi/xóa/mã lỗi
+  không giữ trạng thái cũ; đổi số vé/chuyến/giá làm trạng thái mất hiệu lực.
+- Xem trước không tăng used_count. UseDiscount vẫn chỉ gọi trong transaction
+  Create; không thay đổi chống gửi lặp, khóa ghế hoặc tính nguyên tử hai lượt.
+- Nguyên nhân Enter: nút action=back là submit đầu tiên nên trình duyệt chọn nó
+  khi implicit submit. Đã thêm submit mặc định an toàn action=quote, handler không
+  có action cũng xem giá; Enter tại nút Xác nhận vẫn là action=book. JavaScript
+  chỉ xử lý riêng Enter ô mã, không chặn toàn trang; chặn gửi lặp khi đang áp mã.
+- Bỏ ModelState.Clear toàn bộ khi áp mã; chỉ cập nhật trạng thái mã/tổng tiền,
+  giữ lỗi, giới tính, danh sách người đi và cả hai lượt. Mã lỗi vẫn hiện hành trình
+  với giá chưa giảm, không đưa khách về màn hình chọn chuyến.
+
+File chính: BookingModels.cs, BookingBUS.cs, BookingDraft.cs,
+Pages/Booking/Checkout.cshtml và .cshtml.cs, wwwroot/js/checkout.js.
+
+Kiểm tra: build solution ở tmp/contact-build 0 lỗi, 5 cảnh báo NU1900; 82 kiểm tra
+C# và 12 kiểm tra HTTP đạt, gồm hai request áp lại mã đồng thời và tổng tiền bị sửa.
+checkout.checks.cjs đạt. Đã thử trình duyệt: Enter ở người đặt/hành khách/mã,
+áp lại mã bằng chuột, xác nhận bằng Enter khi thiếu giấy tờ bị validation chặn,
+lỗi tuổi hiển thị dưới ô và giữ toàn bộ dữ liệu. SQL SELECT xác nhận used_count
+EXPAND5/SAVE100 trước và sau đều 18. Không ghi Booking hoặc sửa database.
+Chưa thử tạo đơn thành công trên SQL; vẫn còn vướng bảng BOOKING_WEB_REQUEST
+của script 08 đã báo trước. Các fixture kiểm thử được bổ sung giấy tờ giả rõ ràng;
+không tự tạo giấy tờ cho người dùng hoặc thay dữ liệu CUSTOMER có sẵn.

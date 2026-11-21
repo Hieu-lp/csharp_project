@@ -7,7 +7,7 @@ namespace FlightBooking.Web.Pages.Booking;
 
 public class DetailsModel(BookingBUS bus) : PageModel
 {
-    public BookingDTO? Booking { get; private set; }
+    public IReadOnlyList<BookingDTO> Bookings { get; private set; } = [];
     public string? AccessKey { get; private set; }
     public string? Error { get; private set; }
     [TempData] public string? Notice { get; set; }
@@ -18,8 +18,8 @@ public class DetailsModel(BookingBUS bus) : PageModel
         if (AccessKey is null) return RedirectToPage("Lookup");
         try
         {
-            Booking = bus.Get(id, AccessKey);
-            if (Booking is null) return NotFound();
+            Bookings = bus.GetJourney(id, AccessKey);
+            if (Bookings.Count == 0) return NotFound();
         }
         catch (BookingException e) { Error = e.Message; }
         return Page();
@@ -31,12 +31,12 @@ public class DetailsModel(BookingBUS bus) : PageModel
         if (AccessKey is null) return RedirectToPage("Lookup");
         try
         {
-            bus.Cancel(id, AccessKey);
-            Notice = "Đơn đã hủy. Ghế và lượt giảm giá đã được hoàn đúng một lần.";
+            bus.CancelJourney(id, AccessKey);
+            Notice = "Hành trình đã hủy. Ghế và lượt giảm giá đã được hoàn đúng một lần.";
             return RedirectToPage(new { id });
         }
         catch (BookingException e) { Error = e.Message; }
-        try { Booking = bus.Get(id, AccessKey); } catch (BookingException) { }
+        try { Bookings = bus.GetJourney(id, AccessKey); } catch (BookingException) { }
         return Page();
     }
 }

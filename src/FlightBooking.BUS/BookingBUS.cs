@@ -3,6 +3,8 @@ using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Globalization;
 using FlightBooking.DAO;
 using FlightBooking.DTO;
 using Microsoft.Data.SqlClient;
@@ -14,6 +16,20 @@ public sealed class BookingBUS(string connectionString, TimeProvider? clock = nu
     private readonly BookingDAO dao = new(new MyConnection(connectionString));
     private DateTime Now => TimeZoneInfo.ConvertTime((clock ?? TimeProvider.System).GetUtcNow(),
         TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time")).DateTime;
+    public DateOnly Today => DateOnly.FromDateTime(Now);
+
+    public static DateOnly LatestContactBirthDate(DateOnly today)
+    {
+        var boundary = today.AddYears(-18);
+        return boundary.AddYears(18) < today ? boundary : boundary.AddDays(-1);
+    }
+
+    public static string? ContactBirthDateError(DateOnly? birthDate, DateOnly today)
+    {
+        if (birthDate is not DateOnly dob || dob > today || dob < today.AddYears(-120))
+            return "Nhập ngày sinh người đặt hợp lệ, không ở tương lai.";
+        return dob.AddYears(18) >= today ? "Người đặt phải đã qua ngày sinh nhật lần thứ 18." : null;
+    }
 
     private static T Database<T>(Func<T> action)
     {
@@ -28,10 +44,42 @@ public sealed class BookingBUS(string connectionString, TimeProvider? clock = nu
         { throw new BookingException("Chưa kết nối được database. Kiểm tra cấu hình FlightBookingDB."); }
     }
 
+    public FlightDTO GetFlight(int flightId) => Database(() => dao.Read(d => d.Flight(flightId)));
+
     public IReadOnlyList<AirportDTO> GetAirports() => Database(() => dao.Read(d => d.Airports()));
+
+    public IReadOnlyList<string> GetFareClassNames() => Database(() => dao.Read(d => d.FareClassNames()));
+    public IReadOnlyList<FlightOfferDTO> GetCheapestFlights() => Database(() => dao.Read(d => d.CheapestFlights(Now)));
+
+    public FlightSelectionDTO SelectFlight(int flightId, int fareId, int quantity) => Database(() => dao.Read(d =>
+    {
+        var quote = MakeQuote(d, flightId, fareId, quantity, null, Now, false, requireSeats: false);
+        return new FlightSelectionDTO(quote);
+    }));
+
+    public static decimal? ParseVnd(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        text = text.Trim();
+        if (text.Length > 32 || !Regex.IsMatch(text, @"^(?:[0-9]+|[0-9]{1,3}(?:\.[0-9]{3})+)(?:,[0-9]{1,2})?$"))
+            throw new BookingException("Nhập giá VND không âm, ví dụ 1.000.000 hoặc 1000000.");
+        if (!decimal.TryParse(text.Replace(".", "").Replace(',', '.'), NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture, out var amount) || amount > 9999999999999999.99m)
+            throw new BookingException("Giá vượt giới hạn cho phép.");
+        return amount;
+    }
+
+    public static void ValidatePriceRange(FlightSearch search)
+    {
+        if (search.MinPrice < 0 || search.MaxPrice < 0 || search.MinPrice > search.MaxPrice)
+            throw new BookingException("Giá phải không âm và giá thấp nhất không được lớn hơn giá cao nhất.");
+        if (search.FareClassName?.Length > 50) throw new BookingException("Hạng vé không hợp lệ.");
+    }
 
     public ArrayList Search(FlightSearch search)
     {
+        ValidateSearchDates(search);
+        ValidatePriceRange(search);
         if (search.DepartureAirportId < 1 || search.ArrivalAirportId < 1 || search.DepartureAirportId == search.ArrivalAirportId)
             throw new BookingException("Chọn hai sân bay đi và đến khác nhau.");
         if (search.DepartureDate < DateOnly.FromDateTime(Now) || search.Passengers is < 1 or > 9)
@@ -50,6 +98,8 @@ public sealed class BookingBUS(string connectionString, TimeProvider? clock = nu
     // Advanced predicates are applied in BUS to an ArrayList, never interpolated into SQL.
     public static ArrayList Filter(ArrayList offers, FlightSearch search)
     {
+        ValidateSearchDates(search);
+        ValidatePriceRange(search);
         if (search.Join is not ("AND" or "OR") || search.Operator is not ("=" or "<>" or ">" or ">=" or "<" or "<="))
             throw new BookingException("Phép lọc không hợp lệ.");
         var className = search.ClassName?.Trim() ?? "";
@@ -57,6 +107,9 @@ public sealed class BookingBUS(string connectionString, TimeProvider? clock = nu
         var result = new ArrayList();
         foreach (FlightOfferDTO offer in offers)
         {
+            if (search.ArrivalDate is DateOnly arrival && offer.Flight.ArrivalDate != arrival) continue;
+            if (search.MinPrice is decimal min && offer.Fare.Price < min || search.MaxPrice is decimal max && offer.Fare.Price > max) continue;
+            if (!string.IsNullOrEmpty(search.FareClassName) && !string.Equals(offer.Fare.ClassName, search.FareClassName, StringComparison.OrdinalIgnoreCase)) continue;
             var conditions = new List<bool>();
             if (search.Price is decimal price)
             {
@@ -73,16 +126,26 @@ public sealed class BookingBUS(string connectionString, TimeProvider? clock = nu
         return result;
     }
 
+    public static void ValidateSearchDates(FlightSearch search)
+    {
+        if (search.TripType is not ("OneWay" or "RoundTrip")) throw new BookingException("Loại hành trình không hợp lệ.");
+        if (search.TripType == "OneWay") search.ReturnDate = null;
+        else if (search.ReturnDate is not DateOnly date || date < search.DepartureDate)
+            throw new BookingException("Chọn ngày về từ ngày đi trở đi.");
+        if (search.ArrivalDate is DateOnly arrival && arrival < search.DepartureDate)
+            throw new BookingException("Ngày đến không được trước ngày đi.");
+    }
+
     public BookingQuoteDTO Quote(int flightId, int fareId, int quantity, string? code) => Database(() => dao.Read(d =>
         MakeQuote(d, flightId, fareId, quantity, code, Now, false)));
 
     private static BookingQuoteDTO MakeQuote(BookingData data, int flightId, int fareId, int quantity,
-        string? code, DateTime now, bool locked)
+        string? code, DateTime now, bool locked, bool requireSeats = true)
     {
         if (quantity is < 1 or > 9) throw new BookingException("Mỗi đơn đặt từ 1 đến 9 hành khách.");
         var flight = data.Flight(flightId, locked);
         if (flight.Status != "SCHEDULED" || flight.DepartsAt <= now) throw new BookingException("Chuyến bay không còn nhận đặt vé.");
-        if (flight.SeatsAvailable < quantity) throw new BookingException("Chuyến bay không còn đủ chỗ.");
+        if (requireSeats && flight.SeatsAvailable < quantity) throw new BookingException("Chuyến bay không còn đủ chỗ.");
         var fare = data.Fares(flightId, locked).SingleOrDefault(f => f.FareId == fareId)
             ?? throw new BookingException("Hạng vé không thuộc chuyến bay này.");
         var subtotal = fare.Price * quantity;
@@ -111,39 +174,115 @@ public sealed class BookingBUS(string connectionString, TimeProvider? clock = nu
         return Math.Min(amount, subtotal);
     }
 
+    public JourneyQuoteDTO QuoteJourney(BookingRequest request) => Database(() => dao.Read(d => MakeJourneyQuote(d, request, Now, false)));
+
+    private static JourneyQuoteDTO MakeJourneyQuote(BookingData data, BookingRequest request, DateTime now, bool locked)
+    {
+        NormalizeJourney(request);
+        var outbound = MakeQuote(data, request.FlightId, request.FareId, request.Quantity, request.DiscountCode, now, locked);
+        BookingQuoteDTO? returning = null;
+        if (request.TripType == "RoundTrip")
+        {
+            returning = MakeQuote(data, request.ReturnFlightId!.Value, request.ReturnFareId!.Value, request.Quantity, null, now, locked);
+            ValidateReturn(outbound.Flight, returning.Flight, request.ReturnDate!.Value);
+        }
+        return new(outbound, returning);
+    }
+
+    public static void NormalizeJourney(BookingRequest request)
+    {
+        if (request.Quantity is < 1 or > 9) throw new BookingException("Chọn từ 1 đến 9 hành khách.");
+        if (request.TripType == "OneWay") { request.ReturnDate = null; request.ReturnFlightId = null; request.ReturnFareId = null; }
+        else if (request.TripType != "RoundTrip" || request.ReturnDate is null || request.ReturnFlightId is not > 0 || request.ReturnFareId is not > 0)
+            throw new BookingException("Chọn đầy đủ chuyến đi, chuyến về và ngày về.");
+    }
+
+    public static void ValidateReturn(FlightDTO outbound, FlightDTO returning, DateOnly date)
+    {
+        if (outbound.FlightId == returning.FlightId || returning.DepartureAirportId != outbound.ArrivalAirportId ||
+            returning.ArrivalAirportId != outbound.DepartureAirportId || returning.DepartureDate != date || returning.DepartsAt <= outbound.ArrivesAt)
+            throw new BookingException("Lượt về phải đảo chiều hành trình, đúng ngày về và khởi hành sau khi lượt đi hạ cánh.");
+    }
+
     public int Create(BookingRequest request, string accessKey)
     {
         Validate(request, DateOnly.FromDateTime(Now));
         var hash = HashKey(accessKey);
-        // ExpectedTotal is a consent check, not part of durable request identity.
-        var payloadHash = Hash(JsonSerializer.Serialize(new { request.FlightId, request.FareId,
-            request.Customer, request.Passengers, request.DiscountCode }));
+        var payloadHash = Hash(JsonSerializer.Serialize(new { request.FlightId, request.FareId, request.Quantity, request.TripType,
+            request.ReturnDate, request.ReturnFlightId, request.ReturnFareId, request.Customer, request.Passengers, request.DiscountCode }));
         return Database(() => dao.Write(d =>
         {
             d.LockRequest(hash);
             if (d.FindRequest(hash) is { } previous)
             {
-                if (previous.PayloadHash != payloadHash) throw new BookingException("Biểu mẫu này đã được đặt với nội dung khác. Hãy bắt đầu đơn mới.");
+                if (previous.PayloadHash != payloadHash) throw new BookingException("Biểu mẫu đã được đặt với nội dung khác. Hãy bắt đầu đơn mới.");
                 return previous.BookingId;
             }
+            // Both legs use the same transaction; lock flights in a stable order.
+            foreach (var flightId in new[] { request.FlightId, request.ReturnFlightId ?? request.FlightId }.Distinct().Order())
+                d.Flight(flightId, true);
             var now = Now;
-            var quote = MakeQuote(d, request.FlightId, request.FareId, request.Passengers.Count, request.DiscountCode, now, true);
-            if (request.ExpectedTotal != quote.TotalAmount)
+            var journey = MakeJourneyQuote(d, request, now, true);
+            if (request.ExpectedTotal != journey.TotalAmount)
                 throw new BookingException("Giá hoặc giảm giá vừa thay đổi. Hãy tính lại giá trước khi xác nhận.");
-            var activeSeats = d.ActiveSeats(request.FlightId);
-            if (activeSeats.Count != quote.Flight.TotalSeats - quote.Flight.SeatsAvailable)
-                throw new BookingException("Số liệu ghế không khớp số vé hiệu lực. Liên hệ nhóm quản lý.");
-            var seats = AllocateSeats(quote.Flight.TotalSeats, activeSeats, request.Passengers.Count);
-            d.ReserveSeats(request.FlightId, quote.Quantity);
-            if (quote.DiscountId is int discountId) d.UseDiscount(discountId);
-            // A booking owns a contact snapshot; do not overwrite another customer's details.
             var customerId = d.InsertCustomer(request.Customer);
-            var bookingId = d.InsertBooking(customerId, quote, now);
-            var invoiceId = d.InsertInvoice(bookingId, quote, now);
-            for (var i = 0; i < request.Passengers.Count; i++)
-                d.InsertPassenger(bookingId, invoiceId, quote, request.Passengers[i], seats[i], now);
-            d.SaveRequest(hash, payloadHash, bookingId);
-            return bookingId;
+            int SaveLeg(BookingQuoteDTO quote, string requestHash)
+            {
+                var activeSeats = d.ActiveSeats(quote.Flight.FlightId);
+                if (activeSeats.Count != quote.Flight.TotalSeats - quote.Flight.SeatsAvailable)
+                    throw new BookingException("Số liệu ghế không khớp số vé hiệu lực. Liên hệ nhóm quản lý.");
+                var seats = AllocateSeats(quote.Flight.TotalSeats, activeSeats, request.Quantity);
+                d.ReserveSeats(quote.Flight.FlightId, request.Quantity);
+                if (quote.DiscountId is int discountId) d.UseDiscount(discountId);
+                var bookingId = d.InsertBooking(customerId, quote, now);
+                var invoiceId = d.InsertInvoice(bookingId, quote, now);
+                for (var i = 0; i < request.Quantity; i++)
+                    d.InsertPassenger(bookingId, invoiceId, quote, request.Passengers[i], seats[i], now);
+                d.SaveRequest(requestHash, payloadHash, bookingId);
+                return bookingId;
+            }
+            var id = SaveLeg(journey.Outbound, hash);
+            if (journey.Return is not null) SaveLeg(journey.Return, HashKey(ReturnKey(accessKey)));
+            return id;
+        }));
+    }
+
+    private static string ReturnKey(string accessKey) => Hash("return:" + accessKey.ToUpperInvariant());
+
+    public IReadOnlyList<BookingDTO> GetJourney(int bookingId, string accessKey)
+    {
+        var hash = HashKey(accessKey);
+        return Database(() => dao.Read(d =>
+        {
+            var first = d.Booking(bookingId, hash);
+            var result = new List<BookingDTO>();
+            if (first is null) return result;
+            result.Add(first);
+            var returnHash = HashKey(ReturnKey(accessKey));
+            if (d.FindRequest(returnHash) is { } second)
+                result.Add(d.Booking(second.BookingId, returnHash) ?? throw new BookingException("Không đọc được lượt về."));
+            return result;
+        }));
+    }
+
+    public void CancelJourney(int bookingId, string accessKey)
+    {
+        var hash = HashKey(accessKey);
+        var initial = GetJourney(bookingId, accessKey);
+        if (initial.Count == 0) throw new BookingException("Không tìm thấy hành trình hoặc khóa tra cứu không đúng.");
+        Database(() => dao.Write(d =>
+        {
+            d.LockRequest(hash);
+            foreach (var flightId in initial.Select(b => b.FlightId).Distinct().Order()) d.Flight(flightId, true);
+            var bookings = initial.Select((b, i) => d.Booking(b.BookingId, i == 0 ? hash : HashKey(ReturnKey(accessKey)), true)
+                ?? throw new BookingException("Hành trình đã thay đổi.")).ToList();
+            for (var i = 0; i < bookings.Count; i++)
+            {
+                if (bookings[i].FlightId != initial[i].FlightId) throw new BookingException("Chuyến bay đã thay đổi. Hãy tải lại.");
+                if (bookings[i].Status != "CANCELLED") CheckCancellation(bookings[i], Now);
+            }
+            foreach (var booking in bookings.Where(b => b.Status != "CANCELLED")) d.Cancel(booking);
+            return 0;
         }));
     }
 
@@ -192,10 +331,21 @@ public sealed class BookingBUS(string connectionString, TimeProvider? clock = nu
         return result;
     }
 
+    public static void ResizePassengers(BookingRequest request, int quantity)
+    {
+        if (quantity is < 1 or > 9) throw new BookingException("Chọn từ 1 đến 9 hành khách.");
+        while (request.Passengers.Count < quantity) request.Passengers.Add(new PassengerInput());
+        if (request.Passengers.Count > quantity) request.Passengers.RemoveRange(quantity, request.Passengers.Count - quantity);
+        request.Quantity = quantity;
+    }
+
     public static void Validate(BookingRequest request, DateOnly today)
     {
         if (request.Customer is null || request.Passengers is null || request.Passengers.Any(p => p is null))
             throw new BookingException("Thiếu thông tin khách đặt hoặc hành khách.");
+        NormalizeJourney(request);
+        if (request.Passengers.Count != request.Quantity) throw new BookingException("Số hành khách không khớp số vé đặt.");
+        if (request.Customer.Gender == "Nữ") request.Customer.Gender = "Nu";
         request.Customer.FullName = (request.Customer.FullName ?? "").Trim();
         request.Customer.Phone = (request.Customer.Phone ?? "").Trim();
         request.Customer.Email = (request.Customer.Email ?? "").Trim().ToLowerInvariant();
@@ -211,9 +361,9 @@ public sealed class BookingBUS(string connectionString, TimeProvider? clock = nu
         if (errors.Count > 0) throw new BookingException(errors[0].ErrorMessage ?? "Thông tin không hợp lệ.");
         if (request.FlightId < 1 || request.FareId < 1 || request.Passengers.Count is < 1 or > 9)
             throw new BookingException("Chọn chuyến bay, hạng vé và 1–9 hành khách.");
-        if (request.Customer.DateOfBirth is not DateOnly dob || dob > today || dob < today.AddYears(-120))
-            throw new BookingException("Ngày sinh khách đặt không hợp lệ.");
-        if (request.Customer.Gender is not ("Nam" or "Nữ" or "Khác")) throw new BookingException("Giới tính không hợp lệ.");
+        if (ContactBirthDateError(request.Customer.DateOfBirth, today) is { } birthError)
+            throw new BookingException(birthError);
+        if (request.Customer.Gender is not ("Nam" or "Nu" or "Khác")) throw new BookingException("Giới tính không hợp lệ.");
         if (request.Customer.Email.Any(c => c > 127)) throw new BookingException("Email cần dùng ký tự Latin theo cấu trúc database hiện có.");
         if (request.Passengers.Select(p => p.IdCard).Distinct(StringComparer.OrdinalIgnoreCase).Count() != request.Passengers.Count)
             throw new BookingException("Giấy tờ các hành khách trong cùng đơn không được trùng.");
@@ -221,7 +371,7 @@ public sealed class BookingBUS(string connectionString, TimeProvider? clock = nu
             throw new BookingException("Tổng tiền không hợp lệ.");
     }
 
-    private static string NormalizeCode(string? code)
+    public static string NormalizeCode(string? code)
     {
         var result = (code ?? "").Trim().ToUpperInvariant();
         if (result.Length > 50 || result.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('_' or '-')))
