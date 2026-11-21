@@ -1,14 +1,4 @@
-/* FlightBookingDB v1 - 11 tables, aligned to flight_booking_erd(2).drawio.
-   Intentional fixes/clarifications compared with the uploaded diagram:
-     - TICKET.ticket_id is INT (diagram typo 'in').
-     - BOOKING.total_amount DECIMAL(18,2).
-     - Unicode human-readable fields use NVARCHAR.
-     - Optional cap/limit: DISCOUNT_CODE.max_discount_amount, usage_limit nullable.
-     - DATETIME in diagram represented as DATETIME2(0) for consistent precision.
-     - No airport_code, flight_number or BOOKING.subtotal.
-     - Four separate FLIGHT DATE/TIME fields are retained.
-   Run only once on a new database; do not drop existing tables/data.
-*/
+
 USE FlightBookingDB;
 GO
 SET XACT_ABORT ON;
@@ -244,3 +234,4 @@ GO
 
 SELECT name AS TableName FROM sys.tables WHERE schema_id = SCHEMA_ID(N'dbo') ORDER BY name;
 GO
+
