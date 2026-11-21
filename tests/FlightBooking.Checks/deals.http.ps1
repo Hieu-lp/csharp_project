@@ -27,7 +27,7 @@ $bad=ReadPage @{'DealFlightId'=$pair[0];'DealFareId'=$pair[1];'Search.Passengers
 Assert ($bad.Content.Contains('role="alert"') -and -not $bad.Content.Contains('class="passenger-card"')) 'tampered quantity rejected'
 $bad=ReadPage @{'DealFlightId'=$pair[0];'DealFareId'='2147483647';'Search.Passengers'='1'}
 Assert ($bad.Content.Contains('role="alert"') -and -not $bad.Content.Contains('id="selected-title"')) 'invalid fare rejected with escape link'
-# Existing seed 09 fixture; IDs are only fixture values, not product defaults.
+# Seed 04 round-trip fixture; IDs are only fixture values, not product defaults.
 $search=@{'Submitted'='true';'Search.TripType'='RoundTrip';'Search.DepartureAirportId'='1';'Search.ArrivalAirportId'='2';'Search.DepartureDate'='2026-11-24';'Search.ReturnDate'='2026-11-27';'Search.Passengers'='2';'MinPriceText'='1.000.000';'MaxPriceText'='1.500.000';'Search.FareClassName'='Economy'}
 $filtered=ReadPage $search
 Assert ((Offer $filtered.Content) -ne '' -and -not $filtered.Content.Contains('· Business')) 'price range AND actual fare class filters result'

@@ -11,7 +11,7 @@ function Fields($html) {
 }
 function Choice($html){
  $m=[regex]::Match($html,'<button[^>]*name="SelectedOffer"[^>]*value="([^"]+)"')
- if(-not $m.Success){throw 'Expected seeded future flight choice; run seed 09 first.'}
+ if(-not $m.Success){throw 'Expected future flight choice from seed 04; do not rerun seed on an existing database.'}
  return [Net.WebUtility]::HtmlDecode($m.Groups[1].Value)
 }
 function Query($trip,$count,$draft) {

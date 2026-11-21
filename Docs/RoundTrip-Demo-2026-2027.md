@@ -2,7 +2,9 @@
 
 ## Database và script
 
-Đã áp dụng `Database/09_SeedRoundTripFlights.sql` vào `RNR-LAPTOP / FlightBookingDB`.
+Hiện dùng `Database/04_SeedDemoData.sql` để khởi tạo các chuyến khứ hồi cùng dữ liệu gốc.
+Các số liệu kiểm tra và ID bên dưới ghi nhận từ bản bổ sung cũ trên `RNR-LAPTOP / FlightBookingDB`;
+không phải ID cố định của seed hiện tại. File bổ sung cũ đã được xóa.
 Thời điểm SQL xác nhận theo giờ Việt Nam: 21/11/2026 01:14:20 (UTC+7).
 Script dùng transaction, khóa seed và tra ID sân bay từ AIRPORT; không đổi schema/ERD,
 không sửa seed cũ hoặc dữ liệu đã có. Không tạo sẵn Booking, khách, vé hay hóa đơn.
@@ -72,11 +74,11 @@ Mọi lượt đi: 07:15–09:25; mọi lượt về: 13:40–15:50, hạ cánh 
   Không tự chạy 08 vì yêu cầu giữ nguyên schema; cần nhóm duyệt/ap dụng phụ thuộc
   đã được đề xuất từ trước để dùng chống gửi lặp và tra cứu khi xác nhận thật.
 
-## Chạy lại
+## Khởi tạo dữ liệu và chạy kiểm tra
 
 ```powershell
-# Chạy seed đúng database, không chạy 01..07 lại.
-sqlcmd -S RNR-LAPTOP -E -C -d FlightBookingDB -f 65001 -b -i Database/09_SeedRoundTripFlights.sql
+# Chỉ chạy seed 04 trên database mới sau 01..03. Không chạy lại trên DB đã có dữ liệu.
+sqlcmd -S RNR-LAPTOP -E -C -d FlightBookingDB -f 65001 -b -i Database/04_SeedDemoData.sql
 
 dotnet build FlightBookingSystem.slnx --artifacts-path tmp/contact-build -m:1 --disable-build-servers -p:UseSharedCompilation=false
 dotnet tmp/contact-build/bin/FlightBooking.Checks/debug/FlightBooking.Checks.dll
@@ -119,7 +121,7 @@ Build thành công (0 lỗi, 5 cảnh báo NU1900 do truy cập NuGet). Kiểm t
 website kết nối SQL đạt 14 xác nhận: một chiều/khứ hồi 1→2→3, không cần bấm Tìm lại
 trước khi chọn chuyến, đúng số khối và Quantity, tính lại giá, giữ hành khách/người đặt.
 Không tạo Booking hoặc thay đổi dữ liệu SQL. Chương trình tái hiện:
-`tests/FlightBooking.Checks/passenger-count.http.ps1` (dùng seed 09, ngày 24–27/11/2026).
+`tests/FlightBooking.Checks/passenger-count.http.ps1` (các chuyến hiện có trong seed 04, ngày 24–27/11/2026).
 
 ## Cập nhật: dữ liệu đã có trong seed gốc (21/11/2026)
 
@@ -129,6 +131,6 @@ mở rộng tùy chọn và không thêm trùng sân bay Đà Nẵng đã có t�
 
 Số lượng dự kiến sau 04: 3 AIRPORT, 23 FLIGHT, 45 FARE_CLASS; sau 04 + 07:
 8 AIRPORT, 43 FLIGHT, 85 FARE_CLASS. Booking/vé/hóa đơn mẫu gốc vẫn giữ nguyên.
-09 chỉ còn là bản bổ sung cho những DB đã chạy seed cũ, không cần chạy cho DB mới.
+File bổ sung 09 đã được xóa; dữ liệu khứ hồi nằm trong seed gốc 04.
 Không chạy lại 04/07 trên DB đã có dữ liệu. Các ID và kết quả chạy SQL ở phần trên
-là lịch sử của lần chạy seed 09, không phải ID cố định của bản seed gốc mới.
+là lịch sử của lần chạy bản bổ sung cũ, không phải ID cố định của bản seed gốc mới.

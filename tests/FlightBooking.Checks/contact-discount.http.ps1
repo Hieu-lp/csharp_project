@@ -17,7 +17,8 @@ function Fields($html){
 function Post($fields){[Net.WebUtility]::HtmlDecode((Invoke-WebRequest "$BaseUrl/Booking/Checkout" -Method Post -Body $fields -WebSession $script:webSession).Content)}
 function Total($html){[decimal]::Parse((Fields $html)['Input.ExpectedTotal'],[cultureinfo]::GetCultureInfo('vi-VN'))}
 $script:webSession=New-Object Microsoft.PowerShell.Commands.WebRequestSession
-# Existing seed 09 fixtures, read and preview only; never submit valid action=book.
+# Recorded IDs from the existing local demo; adjust IDs for a fresh seed 04 + 07.
+# Read and preview only; never submit valid action=book.
 $page=[Net.WebUtility]::HtmlDecode((Invoke-WebRequest "$BaseUrl/Booking/Checkout?flightId=42&fareId=82&quantity=2&tripType=RoundTrip&returnDate=2026-11-27&returnFlightId=43&returnFareId=84" -WebSession $script:webSession).Content)
 $data=Fields $page
 $baseTotal=Total $page

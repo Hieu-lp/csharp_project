@@ -12,7 +12,7 @@ internal static class DemoRollbackChecks
         var cs = Environment.GetEnvironmentVariable("FLIGHTBOOKING_DEMO_CONNECTION")
             ?? throw new InvalidOperationException("Set FLIGHTBOOKING_DEMO_CONNECTION explicitly.");
         if (new SqlConnectionStringBuilder(cs).InitialCatalog != "FlightBookingDB")
-            throw new InvalidOperationException("Expected local FlightBookingDB with seed 09.");
+            throw new InvalidOperationException("Expected local FlightBookingDB with round-trip fixtures from seed 04.");
         using var connection = new MyConnection(cs).Open();
         using var select = new SqlCommand("""
             SELECT TOP(1) f.flight_id,a.fare_id,r.flight_id,b.fare_id
@@ -32,7 +32,7 @@ internal static class DemoRollbackChecks
         int outbound, outboundFare, returning, returnFare;
         using (var reader = select.ExecuteReader())
         {
-            if (!reader.Read()) throw new InvalidOperationException("No future seed-09 pair with three seats.");
+            if (!reader.Read()) throw new InvalidOperationException("No future seed-04 round-trip pair with three seats.");
             outbound = reader.GetInt32(0); outboundFare = reader.GetInt32(1);
             returning = reader.GetInt32(2); returnFare = reader.GetInt32(3);
         }

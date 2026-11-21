@@ -199,7 +199,7 @@ BOOKING_WEB_REQUEST của script 08. Xem phần cập nhật cuối
 ## Chuyến mẫu và form hành khách (21/11/2026)
 
 Đã thêm 11 cặp khứ hồi tháng 11/2026, 12/2026, 01/2027 vào database local
-RNR-LAPTOP/FlightBookingDB bằng seed 09, chạy lại không thêm trùng. Checkout chỉ
+RNR-LAPTOP/FlightBookingDB bằng bản bổ sung cũ; dữ liệu này hiện nằm trong seed 04. Checkout chỉ
 có N khối hành khách, Hành khách 1 kiêm người liên hệ; đổi số người tại tìm chuyến.
 Xem [bảng ID/ngày giờ chuyến và kết quả kiểm tra](Docs/RoundTrip-Demo-2026-2027.md).
 
@@ -234,11 +234,11 @@ Chi tiết và giới hạn kiểm tra ở cuối [báo cáo Booking](Docs/Thinh
 
 `Database/04_SeedDemoData.sql` đã bao gồm 11 cặp đi–về (22 chuyến, 44 hạng vé)
 trong tháng 11/2026, 12/2026 và 01/2027, cùng sân bay Đà Nẵng cần cho các tuyến này.
-Database mới chạy 01 → 02 → 03 → 04 là có đủ các cặp trên; không cần chạy 09.
+Database mới chạy 01 → 02 → 03 → 04 là có đủ các cặp trên.
 Sau 04 có 23 chuyến, 45 hạng vé và 3 sân bay. Seed mở rộng 07 chỉ thêm sân bay
 còn thiếu; sau 04 + 07 có 43 chuyến, 85 hạng vé và 8 sân bay.
 
 04 và 07 vẫn chỉ chạy một lần trên database mới/đúng bước, không chạy lại trên DB
-đã có dữ liệu. `09_SeedRoundTripFlights.sql` được giữ làm bản bổ sung cho DB dùng
-seed cũ; file này kiểm tra trùng trước khi thêm. ID chuyến/hạng vé được sinh tự động,
+đã có dữ liệu. File bổ sung 09 đã được xóa vì các chuyến nằm trong seed gốc 04.
+ID chuyến/hạng vé được sinh tự động,
 không dùng các ID ghi nhận từ DB cũ để giả định ID trên máy mới.
