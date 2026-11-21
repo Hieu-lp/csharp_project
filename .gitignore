@@ -1,5 +1,6 @@
 bin/
 obj/
+tmp/
 .vs/
 .vscode/
 *.user
@@ -10,5 +11,4 @@ obj/
 appsettings.Development.json
 *.mdf
 *.ldf
-tmp/
 connection.local.txt

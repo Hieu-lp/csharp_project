@@ -8,5 +8,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/FlightBooking.ManagementChecks/FlightBooking.ManagementChecks.csproj" />
+    <Project Path="tests/FlightBooking.Checks/FlightBooking.Checks.csproj" />
   </Folder>
 </Solution>

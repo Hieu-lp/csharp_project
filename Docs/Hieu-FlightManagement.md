@@ -56,7 +56,9 @@ hình quản lý. Không lấy handler, giao diện web hoặc logic Booking san
 
 Khi tích hợp hai nhánh, giữ một bản MyConnection và BookingModels dùng chung;
 nếu Git báo add/add ở hai file đó, đối chiếu và giữ phiên bản web đầy đủ mới nhất.
-Không tự merge nhánh web trong đợt này.
+Sau khi người dùng xác nhận Booking đã merge qua PR #3, đã tích hợp
+`origin/develop` tại `9ee83b9` vào nhánh Hiếu theo yêu cầu ngày 22/11/2026.
+Không merge phần Hiếu ngược vào develop.
 
 ## Chạy WinForms
 
@@ -144,3 +146,21 @@ vào database đang dùng. File 02 giữ nguyên: khác nhánh web ở chú thí
   trên SQL riêng. Chưa chạy đặt vé website đồng thời với WinForms sau khi merge;
   kiểm tra đồng thời hiện là hai yêu cầu chỉnh sửa qua BUS.
 - Ảnh giao diện kiểm tra lưu local tại tmp/hieu-winforms.png, không commit tmp.
+
+## Kiểm tra sau khi tích hợp develop — 22/11/2026
+
+- Đã lưu phần Hiếu tại commit `6c29a9b` trước khi tích hợp `origin/develop`.
+- Xử lý ba xung đột .gitignore, solution, README bằng cách giữ nội dung của cả
+  hai phần; MyConnection, DTO và Database 04/07/08 đã giống nhau, không bị nhân đôi.
+- Solution hiện chứa cả website Booking, WinForms quản lý và hai project kiểm thử.
+- Build tại tmp/hieu-integrated: 0 lỗi, 12 cảnh báo NU1900 trong lượt có restore
+  (nguồn audit NuGet chưa truy cập được).
+- 82 kiểm tra Booking C#, 56 kiểm tra quản lý (gồm SQL trên database test riêng),
+  các kiểm tra JavaScript và 32 kiểm tra HTTP đều đạt.
+- HTTP xác nhận 1/2/3 khách, đúng form, tìm/chọn khứ hồi, giữ dữ liệu, bộ lọc,
+  áp/đổi/xóa mã, xem trước đồng thời và validation người đặt trên bản tích hợp.
+- Hai máy chủ HTTP kiểm tra đã dừng. Số Booking, vé và tổng lượt dùng mã trong
+  database chính không thay đổi trước/sau thử nghiệm. Không chạy seed hoặc tạo
+  Booking thử vào database chính; chưa kiểm thử đặt vé đồng thời với sửa chuyến.
+- Diff nhập từ develop có dòng trống cuối file sẵn có ở Database/02_CreateTables.sql,
+  deals.http.ps1 và passenger-count.http.ps1; giữ nguyên nội dung các file đó.
