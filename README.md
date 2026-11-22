@@ -1,5 +1,7 @@
 # FlightBookingSystem — Báo cáo tiến độ phần Thịnh
 
+**Chạy thử web và app:** [Hướng dẫn từng bước, dữ liệu mẫu và checklist kiểm tra](Docs/HuongDan-Chay-Va-Test.md).
+
 **Đề tài:** Quản lý bán vé máy bay
 
 **Người phụ trách:** Thịnh — BOOKING, BOOKING_DETAIL và website Razor Pages
@@ -242,3 +244,20 @@ còn thiếu; sau 04 + 07 có 43 chuyến, 85 hạng vé và 8 sân bay.
 đã có dữ liệu. File bổ sung 09 đã được xóa vì các chuyến nằm trong seed gốc 04.
 ID chuyến/hạng vé được sinh tự động,
 không dùng các ID ghi nhận từ DB cũ để giả định ID trên máy mới.
+
+## Phần Hiếu — quản lý sân bay, chuyến bay và hạng vé
+
+Nhánh `feature/flight-management` có ba màn hình WinForms, CRUD và tìm kiếm
+ArrayList trong BUS. Chọn chuyến liên kết danh sách hạng vé; các thao tác sửa/xóa
+được kiểm tra để bảo vệ Booking và vé đã có.
+
+```powershell
+$env:ConnectionStrings__FlightBookingDB = 'Server=YOUR_SERVER;Database=FlightBookingDB;Integrated Security=True;Encrypt=True;TrustServerCertificate=True'
+dotnet run --project src/FlightBooking.WinForms
+```
+
+Xem [báo cáo phần Hiếu, quy tắc dữ liệu và hướng dẫn kiểm tra](Docs/Hieu-FlightManagement.md).
+
+## Tích hợp trên nhánh Hiếu — 22/11/2026
+
+Đã đưa develop chứa Booking (PR #3, 9ee83b9) vào feature/flight-management; giữ cả website và WinForms cùng hai project kiểm thử. Chưa merge phần Hiếu vào develop. Các kết quả lịch sử phía trên mô tả từng thời điểm; xem báo cáo Hiếu để biết kết quả kiểm tra sau tích hợp.

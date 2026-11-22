@@ -11,3 +11,4 @@ tmp/
 appsettings.Development.json
 *.mdf
 *.ldf
+connection.local.txt
