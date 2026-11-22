@@ -202,6 +202,8 @@ Trạng thái triển khai phần WinForms:
 - Form mã giảm giá dùng `DiscountCodeBUS` để kiểm tra mã trùng, loại/giá trị giảm, thời hạn và giới hạn lượt; `UsedCount` chỉ đọc.
 - Tìm kiếm mã giảm giá bao gồm min order, max discount, usage limit và used count.
 - `dotnet build FlightBookingSystem.slnx -c Release` thành công, 0 cảnh báo, 0 lỗi.
+- Project `tests/FlightBooking.ManagementChecks` có 12 check offline cho validation Customer/Employee/DiscountCode và lọc `ArrayList`; cả 12 đều đạt.
+- Các check offline không kiểm tra CRUD/duplicate thật với SQL Server; phần đó cần database test được phép ghi.
 - Chưa chạy CRUD với SQL Server; cần cấu hình kết nối và dùng database thử nghiệm được phép ghi dữ liệu.
 
 ## Luồng dữ liệu
