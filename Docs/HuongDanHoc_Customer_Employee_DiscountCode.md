@@ -186,20 +186,22 @@ Giới hạn hiện tại: tìm kiếm nạp các dòng qua DAO rồi lọc tron
 
 Trước mỗi thay đổi code, trình bày mục tiêu, luồng xử lý và bài tập/điểm cần hiểu. Sau khi trao đổi xong mới cập nhật file; khi sửa xong giải thích các dòng/khối mới và cập nhật mục tiến độ trong ghi chú này.
 
-Thứ tự triển khai tiếp theo:
+Trạng thái triển khai phần WinForms:
 
-1. Làm WinForms quản lý khách hàng, nối Form với `CustomerBUS`.
-2. Làm WinForms quản lý nhân viên và mã giảm giá.
-3. Hỗ trợ MainForm/menu và tích hợp với các thành viên.
-4. Khi bạn cho phép chạy thử DB, cấu hình kết nối SQL Server và kiểm tra CRUD trên dữ liệu phù hợp.
-5. Sau khi hoàn thiện chức năng: build, commit, push nhánh cá nhân, tạo PR vào develop và xin review.
+1. Đã tạo màn hình khách hàng, nhân viên và mã giảm giá.
+2. Đã tạo `MainForm` có menu và thanh điều hướng giữa ba màn hình.
+3. Đã nối CRUD/tìm kiếm với BUS; chưa chạy CRUD trên SQL Server vì thao tác ghi làm thay đổi dữ liệu.
+4. Còn cần đồng bộ `develop`, kiểm tra với SQL Server test được phép ghi, rồi tạo PR và xin review.
 # WinForms quản lý khách hàng
 
 ## Trạng thái triển khai
 
-- Đã tạo `CustomerManagementForm` với tìm kiếm, tải lại, thêm, cập nhật, xóa, chọn dòng và làm trống form.
-- `Program.cs` hiện mở `CustomerManagementForm` để chạy thử màn hình.
-- `dotnet build FlightBookingSystem.slnx` thành công, 0 cảnh báo, 0 lỗi.
+- Đã tạo `CustomerManagementForm`, `EmployeeManagementForm` và `DiscountCodeManagementForm` với xem, tìm, thêm, cập nhật, xóa và chọn dòng.
+- Đã tạo `MainForm` có menu trên và thanh điều hướng; `Program.cs` mở `MainForm`.
+- Form nhân viên dùng `EmployeeBUS` để kiểm tra trùng phone/email và trạng thái.
+- Form mã giảm giá dùng `DiscountCodeBUS` để kiểm tra mã trùng, loại/giá trị giảm, thời hạn và giới hạn lượt; `UsedCount` chỉ đọc.
+- Tìm kiếm mã giảm giá bao gồm min order, max discount, usage limit và used count.
+- `dotnet build FlightBookingSystem.slnx -c Release` thành công, 0 cảnh báo, 0 lỗi.
 - Chưa chạy CRUD với SQL Server; cần cấu hình kết nối và dùng database thử nghiệm được phép ghi dữ liệu.
 
 ## Luồng dữ liệu
@@ -225,3 +227,6 @@ Thứ tự triển khai tiếp theo:
 2. Viết lại luồng chọn một dòng: `DataBoundItem → CustomerDTO → điền TextBox`.
 3. Giải thích `ShowBusinessError`: vì sao `null` nghĩa là không có lỗi.
 4. Tập viết lại `SearchCustomers`: gọi BUS, chuyển `ArrayList` sang DTO list, gán `DataSource`.
+5. So sánh form nhân viên với form khách hàng: các bước CRUD nào giống nhau?
+6. Giải thích vì sao form mã giảm giá không cho sửa `UsedCount`.
+7. Lần theo một lần nhấn menu: `MainForm → form con → BUS`.

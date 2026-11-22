@@ -1,5 +1,6 @@
 using FlightBooking.BUS;
 using FlightBooking.DTO;
+using Microsoft.Data.SqlClient;
 
 namespace FlightBooking.WinForms;
 
@@ -391,8 +392,11 @@ public sealed class CustomerManagementForm : Form
     private void ShowDataError(Exception exception)
     {
         _statusLabel.Text = "Không tải/thao tác được dữ liệu khách hàng.";
+        string detail = exception is SqlException { Number: 547 }
+            ? "Database từ chối thao tác vì khách hàng đang được dữ liệu khác tham chiếu hoặc vi phạm ràng buộc."
+            : exception.Message;
         MessageBox.Show(
-            $"Không thể hoàn thành thao tác với dữ liệu khách hàng.\nChi tiết: {exception.Message}",
+            $"Không thể hoàn thành thao tác với dữ liệu khách hàng.\nChi tiết: {detail}",
             "Lỗi",
             MessageBoxButtons.OK,
             MessageBoxIcon.Error);

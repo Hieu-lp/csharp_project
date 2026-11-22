@@ -62,7 +62,11 @@ public class DiscountCodeBUS
                 Contains(discount.Description, searchText) ||
                 Contains(discount.DiscountType, searchText) ||
                 Contains(discount.DiscountValue.ToString(), searchText) ||
+                Contains(discount.MinOrderAmount.ToString(), searchText) ||
+                Contains(discount.MaxDiscountAmount?.ToString() ?? string.Empty, searchText) ||
                 Contains(discount.Status, searchText) ||
+                Contains(discount.UsageLimit?.ToString() ?? string.Empty, searchText) ||
+                Contains(discount.UsedCount.ToString(), searchText) ||
                 Contains(discount.StartDate.ToString("yyyy-MM-dd HH:mm:ss"), searchText) ||
                 Contains(discount.EndDate.ToString("yyyy-MM-dd HH:mm:ss"), searchText);
 
