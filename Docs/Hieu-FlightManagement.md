@@ -164,3 +164,45 @@ vào database đang dùng. File 02 giữ nguyên: khác nhánh web ở chú thí
   Booking thử vào database chính; chưa kiểm thử đặt vé đồng thời với sửa chuyến.
 - Diff nhập từ develop có dòng trống cuối file sẵn có ở Database/02_CreateTables.sql,
   deals.http.ps1 và passenger-count.http.ps1; giữ nguyên nội dung các file đó.
+
+## Cập nhật UI/UX WinForms — 22/11/2026
+
+- Áp dụng ui-ux-pro-max và Ponytail: control WinForms, Segoe UI, nền sáng,
+  thao tác chính xanh dương; không thêm thư viện giao diện.
+- Form1 giữ ba tab Sân bay / Chuyến bay / Hạng vé. ManagementPage tách danh sách,
+  vùng chi tiết và ba trạng thái Xem / Thêm mới / Chỉnh sửa; Lưu và Hủy nằm cố định
+  ngoài vùng cuộn. Xóa có xác nhận riêng, ghi rõ mã và tên bản ghi.
+- Ui.cs gom màu, control và bố cục chung. EditorSession.cs ghi nhận trạng thái
+  và nội dung gốc để chỉ cảnh báo khi thật sự có thay đổi. Chặn đổi dòng, đổi tab,
+  tải lại và đóng cửa sổ khi người dùng chưa đồng ý bỏ dữ liệu đang sửa.
+- Tìm nhanh bằng Enter; bộ lọc nâng cao mở/thu gọn, nhãn tiếng Việt ánh xạ về
+  trường/toán tử gốc. Giữ ArrayList trong BUS, AND/OR/NOT và phạm vi chuyến của hạng vé.
+- Chuyến bay vẫn có hai ListView liên kết, nhóm Chặng bay / Lịch bay /
+  Số ghế–trạng thái / Thông tin hệ thống. Trạng thái hiển thị tiếng Việt,
+  lưu SCHEDULED / COMPLETED / CANCELLED. Vé bán, ghế còn, doanh thu chỉ đọc.
+- SelectionDialog giữ biến static, tìm kiếm, Enter chọn, Esc hủy và xóa lựa chọn
+  khi hủy/đóng. Mở quản lý hạng vé giữ đúng tuyến/ngày và mã chuyến đã chọn.
+- Lỗi gần trường nhập bằng ErrorProvider và thông báo trên màn hình; không xóa
+  nội dung khi lưu lỗi. Lưu xong giữ đúng mã bản ghi, kể cả khi nằm ngoài bộ lọc.
+  Nếu ghi thành công nhưng tải lại lỗi, biểu mẫu trở về Xem để không tạo lặp đơn ghi.
+
+### Kiểm tra của đợt UI
+
+- Build toàn solution tại `tmp/hieu-ui-final-build`: 0 lỗi, 12 cảnh báo NU1900
+  trong lượt có restore do không truy cập được dữ liệu audit NuGet.
+- 37 kiểm tra C# quản lý (gồm 6 kiểm tra trạng thái editor) và 82 kiểm tra C# Booking đạt.
+  Không chạy lại bộ SQL tự động trong đợt UI.
+- Đã mở và thao tác WinForms thực tế trên **RNR-LAPTOP/FlightBooking_Hieu_ManagementTests**:
+  trạng thái chưa có dữ liệu, lưu thiếu tên báo lỗi gần ô, thêm hai sân bay, sửa sân bay
+  giữ mã #10, cảnh báo đổi tab và chọn No giữ nội dung, Hủy phục hồi, tìm nhanh bằng Enter,
+  mở/xóa/thu bộ lọc, chọn sân bay bằng cửa sổ và Enter, Esc hủy, tạo chuyến #7 và
+  hai hạng #7/#8. Mở quản lý hạng giữ chuyến #7; Tải lại tab Chuyến bay hiện hai hạng đúng.
+- Còn dữ liệu UI TEST trong database kiểm thử riêng: sân bay #10/#11, chuyến #7,
+  hạng #7/#8. Không tạo Booking/vé/hóa đơn; không ghi/xóa dữ liệu database chính.
+- Đã quan sát cửa sổ thường và phóng lớn, vùng cuộn dài và Lưu/Hủy cố định.
+  Chưa kiểm chứng riêng đủ ma trận 1366×768 / 1920×1080 × DPI 100% / 125% / 150%;
+  chưa thử bấm Xóa trên GUI trong đợt này. Bảo vệ xóa/khóa ngoại BUS/DAO giữ nguyên.
+- Ảnh kiểm tra local: `tmp/hieu-ui-final.png`. Không sửa Database, seed, script 08,
+  ERD, website hoặc nghiệp vụ BUS/DAO. Chênh lệch ERD–SQL trước đó chưa xử lý ở đợt UI.
+- Phạm vi vẫn chỉ AIRPORT / FLIGHT / FARE_CLASS; không nhận hoàn thành hóa đơn,
+  thống kê, PDF hoặc Excel của thành viên khác. Chưa commit/push/merge đợt UI này.

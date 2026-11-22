@@ -36,5 +36,16 @@ foreach(var (op,count) in new[]{("=",1),("<>",1),(">",1),(">=",2),("<",0),("<=",
 Check(ManagementSearch.Filter(new(){new FlightManagementDTO(flight,1,100)},[new("Ngày đến","=","01/01/2027")]).Count==1,"date predicate");
 Check(ManagementSearch.Filter(new(){new FareClassDTO(1,1,"Eco",1000000,7)},[new("Giá",">=","1.000.000")]).Count==1,"Vietnamese money predicate");
 Reject(()=>ManagementSearch.Filter(rows,[new("Mã","=","not a number")]),"invalid filter number");
+var editor = new FlightBooking.WinForms.EditorSession();
+editor.Begin(FlightBooking.WinForms.EditorMode.View,"saved");
+Check(!editor.IsDirty("changed")&&!editor.CanSave("changed"),"view mode never edits or saves");
+editor.Begin(FlightBooking.WinForms.EditorMode.New,"defaults");
+Check(!editor.IsDirty("defaults")&&editor.CanSave("defaults"),"opening new form alone is clean but save validates defaults");
+Check(editor.IsDirty("typed"),"new typed data requires discard confirmation");
+editor.Begin(FlightBooking.WinForms.EditorMode.Edit,"saved");
+Check(!editor.CanSave("saved")&&editor.CanSave("changed"),"edit save enabled only for actual changes");
+Check(!editor.IsDirty("saved"),"undoing typing does not prompt to discard");
+editor.Begin(FlightBooking.WinForms.EditorMode.View,"committed");
+Check(!editor.IsDirty("committed")&&!editor.CanSave("committed"),"successful save or cancel returns clean view");
 if(args.Contains("--sql"))SqlManagementChecks.Run(Check,Reject);
 Console.WriteLine($"{checks} checks passed.");

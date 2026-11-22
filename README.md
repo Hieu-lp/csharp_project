@@ -1,5 +1,7 @@
 # FlightBookingSystem — Báo cáo tiến độ phần Thịnh
 
+**Chạy thử web và app:** [Hướng dẫn từng bước, dữ liệu mẫu và checklist kiểm tra](Docs/HuongDan-Chay-Va-Test.md).
+
 **Đề tài:** Quản lý bán vé máy bay
 
 **Người phụ trách:** Thịnh — BOOKING, BOOKING_DETAIL và website Razor Pages
