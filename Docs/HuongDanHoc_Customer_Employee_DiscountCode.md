@@ -193,3 +193,35 @@ Thứ tự triển khai tiếp theo:
 3. Hỗ trợ MainForm/menu và tích hợp với các thành viên.
 4. Khi bạn cho phép chạy thử DB, cấu hình kết nối SQL Server và kiểm tra CRUD trên dữ liệu phù hợp.
 5. Sau khi hoàn thiện chức năng: build, commit, push nhánh cá nhân, tạo PR vào develop và xin review.
+# WinForms quản lý khách hàng
+
+## Trạng thái triển khai
+
+- Đã tạo `CustomerManagementForm` với tìm kiếm, tải lại, thêm, cập nhật, xóa, chọn dòng và làm trống form.
+- `Program.cs` hiện mở `CustomerManagementForm` để chạy thử màn hình.
+- `dotnet build FlightBookingSystem.slnx` thành công, 0 cảnh báo, 0 lỗi.
+- Chưa chạy CRUD với SQL Server; cần cấu hình kết nối và dùng database thử nghiệm được phép ghi dữ liệu.
+
+## Luồng dữ liệu
+
+`CustomerManagementForm → CustomerBUS → CustomerDAO → SQL Server`
+
+- Form lấy dữ liệu từ các ô nhập, gọi BUS và hiển thị thông báo/kết quả.
+- BUS kiểm tra dữ liệu và gọi DAO; form không tự viết SQL.
+- DAO thực hiện câu SQL có tham số; không sửa cấu trúc database khi làm giao diện.
+
+## Các phần giao diện
+
+- Ô tìm kiếm gọi `CustomerBUS.Search`; kết quả `ArrayList` được chuyển thành `List<CustomerDTO>` để gán cho `DataGridView`.
+- Bảng chỉ đọc; chọn một dòng sẽ chép dữ liệu vào các ô nhập để cập nhật hoặc xóa.
+- Thêm, cập nhật và xóa gọi lần lượt `Add`, `Update`, `Delete` trong BUS.
+- ID chỉ đọc vì SQL Server tự tạo; form không gửi ID khi thêm.
+- Xóa luôn hỏi xác nhận. Nếu database từ chối vì khách hàng đang được booking tham chiếu, lỗi được hiển thị cho người dùng.
+- Nếu chưa cấu hình `FLIGHTBOOKING_DB_CONNECTION` hoặc SQL Server không sẵn sàng, form báo lỗi khi nạp/thao tác dữ liệu.
+
+## Bài tập tự viết lại
+
+1. Giải thích vì sao `AddCustomer` gọi BUS thay vì chứa câu `INSERT`.
+2. Viết lại luồng chọn một dòng: `DataBoundItem → CustomerDTO → điền TextBox`.
+3. Giải thích `ShowBusinessError`: vì sao `null` nghĩa là không có lỗi.
+4. Tập viết lại `SearchCustomers`: gọi BUS, chuyển `ArrayList` sang DTO list, gán `DataSource`.
