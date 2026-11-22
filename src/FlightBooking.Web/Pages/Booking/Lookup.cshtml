@@ -1,0 +1,13 @@
+@page
+@model FlightBooking.Web.Pages.Booking.LookupModel
+@{ ViewData["Title"] = "Tra cứu đơn đặt"; }
+<div class="page-heading"><span class="eyebrow">HÀNH TRÌNH CỦA BẠN</span><h1>Tra cứu đơn đặt.</h1><p>Dùng mã đơn và khóa tra cứu riêng được cấp khi đặt vé.</p></div>
+<section class="panel narrow">
+    @if (Model.Error is not null) { <div class="alert" role="alert">@Model.Error</div> }
+    <form method="post"><div asp-validation-summary="All" class="validation-summary" role="alert"></div>
+        <label asp-for="BookingId">Mã đơn (phần số)</label><input asp-for="BookingId" type="number" min="1" required />
+        <label asp-for="AccessKey">Khóa tra cứu 64 ký tự</label><input asp-for="AccessKey" type="password" minlength="64" maxlength="64" autocomplete="off" required />
+        <p class="muted">Khóa cho phép xem thông tin và hủy đơn hợp lệ. Không chia sẻ khóa với người khác.</p>
+        <button class="button" type="submit">Xem đơn đặt →</button>
+    </form>
+</section>

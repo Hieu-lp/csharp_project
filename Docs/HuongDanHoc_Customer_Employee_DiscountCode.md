@@ -132,7 +132,12 @@ Files: `src/FlightBooking.DTO/EmployeeDTO.cs` và `src/FlightBooking.DTO/Discoun
 
 File: `src/FlightBooking.DAO/MyConnection.cs`.
 
-`CreateConnection()` đọc biến môi trường `FLIGHTBOOKING_DB_CONNECTION`. Nếu chưa có chuỗi kết nối thì ném `InvalidOperationException` với hướng dẫn. Hàm chỉ tạo `SqlConnection`, không mở; DAO mở và tự giải phóng qua `using`. Không ghi mật khẩu vào code hoặc commit.
+`MyConnection` hiện hỗ trợ hai cách dùng để tương thích với Web booking và các DAO quản lý:
+
+- `new MyConnection(connectionString).Open()` mở kết nối mà Web booking đã cấu hình.
+- `CreateConnection()` đọc biến môi trường `FLIGHTBOOKING_DB_CONNECTION`, tạo kết nối chưa mở để Customer/Employee/Discount DAO tự mở và giải phóng bằng `using`.
+
+Nếu biến môi trường thiếu, `CreateConnection()` ném `InvalidOperationException` với hướng dẫn. Không ghi mật khẩu vào code hoặc commit.
 
 Biến môi trường này **chưa được cấu hình**, nên hiện chưa thể chạy truy vấn với SQL Server. Cần cấu hình cho tiến trình chạy WinForms trước bước chạy thử.
 
@@ -173,14 +178,16 @@ Giới hạn hiện tại: tìm kiếm nạp các dòng qua DAO rồi lọc tron
 | MyConnection | Hoàn tất; biến môi trường hiện chưa được cấu hình |
 | DAO cho ba bảng: đọc, theo ID, trùng, thêm, sửa, xóa | Hoàn tất trong code |
 | BUS cho ba bảng: kiểm tra, chuẩn hóa, CRUD, tìm kiếm ArrayList | Hoàn tất trong code |
-| WinForms khách hàng | Chưa làm |
-| WinForms quản lý nhân viên | Chưa làm |
-| WinForms quản lý mã giảm giá | Chưa làm |
-| MainForm/menu tích hợp | Chưa làm |
+| WinForms khách hàng | Hoàn tất, có xem/tìm/thêm/sửa/xóa |
+| WinForms quản lý nhân viên | Hoàn tất, có xem/tìm/thêm/sửa/xóa |
+| WinForms quản lý mã giảm giá | Hoàn tất, có xem/tìm/thêm/sửa/xóa và kiểm tra thời hạn/giá trị |
+| MainForm/menu tích hợp | Hoàn tất, menu trên và điều hướng trái |
 | `dotnet build FlightBookingSystem.slnx` | Thành công, 0 warning, 0 error |
-| Chạy thử kết nối/CRUD với SQL Server | Chưa làm; không thực hiện theo yêu cầu không đụng DB |
-| Commit code và push | Chưa làm; code và ghi chú hiện chỉ là thay đổi local |
-| PR vào develop và review | Chưa làm |
+| ManagementChecks offline | 12/12 đạt; không kết nối SQL |
+| Chạy thử CRUD với SQL Server | Chưa làm; cần database test được phép ghi |
+| Commit code và push | Đã push lên `feature/customer-management` |
+| Đồng bộ develop | Đã nhập `origin/develop`; xử lý tương thích API kết nối và DiscountCodeDTO |
+| PR vào develop và review | Chưa tạo |
 
 ## 9. Cách học và quy trình tiếp theo
 
@@ -191,7 +198,7 @@ Trạng thái triển khai phần WinForms:
 1. Đã tạo màn hình khách hàng, nhân viên và mã giảm giá.
 2. Đã tạo `MainForm` có menu và thanh điều hướng giữa ba màn hình.
 3. Đã nối CRUD/tìm kiếm với BUS; chưa chạy CRUD trên SQL Server vì thao tác ghi làm thay đổi dữ liệu.
-4. Còn cần đồng bộ `develop`, kiểm tra với SQL Server test được phép ghi, rồi tạo PR và xin review.
+4. Đã đồng bộ `origin/develop`; còn cần kiểm tra CRUD với SQL Server test được phép ghi, rồi tạo PR và xin review.
 # WinForms quản lý khách hàng
 
 ## Trạng thái triển khai
