@@ -12,8 +12,6 @@ public partial class Form1 : Form
         Bounds = Ui.WindowBounds(work, new Size(1340, 840));
         MinimumSize = new Size(Math.Min(1040, work.Width - 24), Math.Min(640, work.Height - 24));
         var connection = Environment.GetEnvironmentVariable("ConnectionStrings__FlightBookingDB");
-        if (string.IsNullOrWhiteSpace(connection))
-            connection = Environment.GetEnvironmentVariable("FLIGHTBOOKING_DB_CONNECTION");
         var path = Path.Combine(AppContext.BaseDirectory, "connection.local.txt");
         if (string.IsNullOrWhiteSpace(connection) && File.Exists(path)) connection = File.ReadAllText(path).Trim();
         var bus = new FlightBooking.BUS.ManagementBUS(connection ?? "");
