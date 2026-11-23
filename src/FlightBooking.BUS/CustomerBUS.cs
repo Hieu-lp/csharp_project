@@ -103,6 +103,7 @@ public class CustomerBUS
         if (customer.DateOfBirth == default || customer.DateOfBirth.Date > DateTime.Today) return "Ngày sinh không hợp lệ.";
         if (string.IsNullOrWhiteSpace(customer.Gender)) return "Giới tính không được để trống.";
         if (customer.Gender.Length > 10) return "Giới tính không được dài quá 10 ký tự.";
+        if (customer.Gender is not ("Nam" or "Nữ" or "Nu" or "Khác")) return "Giới tính không hợp lệ.";
         if (customer.IdPassportNumber?.Length > 50) return "Số giấy tờ tùy thân không được dài quá 50 ký tự.";
         return null;
     }

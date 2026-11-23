@@ -124,9 +124,9 @@ public sealed class DiscountCodeManagementForm : Form
         AddField(fields, 0, 2, "Mã giảm giá:", _codeTextBox);
         AddField(fields, 1, 0, "Mô tả:", _descriptionTextBox, columnSpan: 3);
         AddField(fields, 2, 0, "Loại giảm:", _typeComboBox);
-        AddField(fields, 2, 2, "Giá trị giảm:", _valueInput);
-        AddField(fields, 3, 0, "Đơn tối thiểu:", _minimumOrderInput);
-        AddField(fields, 3, 2, "Mức giảm tối đa:", BuildOptionalInput(_hasMaximumDiscountCheckBox, _maximumDiscountInput));
+        AddField(fields, 2, 2, "Giá trị giảm (%/đồng):", _valueInput);
+        AddField(fields, 3, 0, "Đơn tối thiểu (đồng):", _minimumOrderInput);
+        AddField(fields, 3, 2, "Giảm tối đa (đồng):", BuildOptionalInput(_hasMaximumDiscountCheckBox, _maximumDiscountInput));
         AddField(fields, 4, 0, "Bắt đầu:", _startDatePicker);
         AddField(fields, 4, 2, "Kết thúc:", _endDatePicker);
         AddField(fields, 5, 0, "Giới hạn lượt:", BuildOptionalInput(_hasUsageLimitCheckBox, _usageLimitInput));

@@ -27,7 +27,7 @@ public sealed class CustomerManagementForm : Form
     };
     private readonly ComboBox _genderComboBox = new()
     {
-        DropDownStyle = ComboBoxStyle.DropDown,
+        DropDownStyle = ComboBoxStyle.DropDownList,
         Dock = DockStyle.Fill
     };
 
@@ -54,8 +54,8 @@ public sealed class CustomerManagementForm : Form
         Size = new Size(1200, 800);
         Font = new Font("Segoe UI", 9F);
 
-        // Cho phép chọn cả các giá trị đang có trong seed, kể cả "Nu" không dấu.
-        _genderComboBox.Items.AddRange(["Nam", "Nữ", "Nu", "Khác"]);
+        // Chỉ hiện một lựa chọn Nữ; dữ liệu cũ "Nu" được quy đổi khi nạp lên form.
+        _genderComboBox.Items.AddRange(["Nam", "Nữ", "Khác"]);
         _genderComboBox.Text = "Nam";
 
         ConfigureGrid();
@@ -361,7 +361,7 @@ public sealed class CustomerManagementForm : Form
         _phoneTextBox.Text = customer.Phone;
         _emailTextBox.Text = customer.Email;
         _dateOfBirthPicker.Value = customer.DateOfBirth;
-        _genderComboBox.Text = customer.Gender;
+        _genderComboBox.Text = customer.Gender == "Nu" ? "Nữ" : customer.Gender;
         _passportTextBox.Text = customer.IdPassportNumber ?? string.Empty;
     }
 

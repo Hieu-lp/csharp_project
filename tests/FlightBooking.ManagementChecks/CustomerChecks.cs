@@ -20,6 +20,10 @@ internal static class CustomerChecks
         CustomerDTO futureBirthDate = ValidCustomer();
         futureBirthDate.DateOfBirth = DateTime.Today.AddDays(1);
         CheckAssert.ErrorContains(bus.Add(futureBirthDate), "Ngày sinh", "Customer rejects a future birth date before database access");
+
+        CustomerDTO invalidGender = ValidCustomer();
+        invalidGender.Gender = "Other";
+        CheckAssert.ErrorContains(bus.Add(invalidGender), "Giới tính", "Customer rejects an unsupported gender before database access");
     }
 
     private static CustomerDTO ValidCustomer() => new()
