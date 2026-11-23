@@ -3,151 +3,495 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using FlightBooking.DAO;
 using FlightBooking.DTO;
-using Microsoft.Data.SqlClient;
 
 namespace FlightBooking.BUS;
 
-public sealed class ManagementBUS(string connectionString)
+public sealed class ManagementBUS
 {
-    private readonly ManagementDAO dao=new(connectionString);
-    private static T Database<T>(Func<T> action)
+    private readonly ManagementDAO dao;
+
+    public ManagementBUS(string connectionString)
     {
-        try{return action();}
-        catch(SqlException e) when(e.Number==547){throw new ManagementException("Dữ liệu đang được tham chiếu hoặc sân bay/chuyến bay không còn tồn tại. Hãy tải lại.");}
-        catch(SqlException e) when(e.Number is 2601 or 2627){throw new ManagementException("Thông tin bị trùng. Hãy tải lại và kiểm tra tên hạng vé.");}
-        catch(SqlException e) when(e.Number==1205){throw new ManagementException("Dữ liệu đang được người khác xử lý. Hãy tải lại rồi thử lại.");}
-        catch(SqlException){throw new ManagementException("Không thể xử lý SQL Server. Kiểm tra kết nối, quyền truy cập và cấu trúc database.");}
-        catch(InvalidOperationException){throw new ManagementException("Chưa cấu hình hoặc chưa kết nối được FlightBookingDB.");}
+        dao = new ManagementDAO(connectionString);
     }
-    public ArrayList Airports()=>Database(()=>dao.Read(d=>new ArrayList(d.Airports())));
-    public ArrayList Flights()=>Database(()=>dao.Read(d=>new ArrayList(d.Flights())));
-    public ArrayList Fares(int? flightId=null)=>Database(()=>dao.Read(d=>new ArrayList(d.Fares(flightId))));
-    private static void Require(bool value,string message){if(!value)throw new ManagementException(message);}
-    private static string Text(string? value,int max,string name)
-    {var result=(value??"").Trim();Require(result.Length>0&&result.Length<=max,$"{name} bắt buộc, tối đa {max} ký tự.");return result;}
-    public static AirportDTO ValidateAirport(AirportDTO a)=>a with{AirportName=Text(a.AirportName,150,"Tên sân bay"),City=Text(a.City,100,"Thành phố")};
-    public int SaveAirport(AirportDTO input,AirportDTO? original=null)
+    public ArrayList Airports()
     {
-        var a=ValidateAirport(input);Require(a.AirportId>=0,"Mã sân bay không hợp lệ.");
-        return Database(()=>dao.Write(d=>{
-            if(a.AirportId>0)Require(original is not null&&d.Airport(a.AirportId,true)==original,"Sân bay đã thay đổi. Hãy tải lại rồi chọn lại dòng.");
-            Require(!d.AirportDuplicate(a),"Đã có sân bay cùng tên và thành phố.");return d.SaveAirport(a);
-        }));
+        return new ArrayList(dao.GetAirports());
     }
-    public void DeleteAirport(AirportDTO original)=>Database(()=>dao.Write(d=>{
-        Require(d.Airport(original.AirportId,true)==original,"Sân bay đã thay đổi. Hãy tải lại.");
-        Require(!d.AirportUsed(original.AirportId),"Không xóa sân bay đang được chuyến bay sử dụng.");d.DeleteAirport(original.AirportId);return 0;
-    }));
-    public static void ValidateFlight(FlightEdit f)
+
+    public ArrayList Flights()
     {
-        Require(f.FlightId>=0&&f.DepartureAirportId>0&&f.ArrivalAirportId>0&&f.DepartureAirportId!=f.ArrivalAirportId,"Chọn hai sân bay đi/đến khác nhau.");
-        Require(f.TotalSeats>0,"Tổng số ghế phải lớn hơn 0.");
-        Require(f.ArrivalDate.ToDateTime(f.ArrivalTime)>f.DepartureDate.ToDateTime(f.DepartureTime),"Ngày giờ đến phải sau ngày giờ đi.");
-        Require(f.Status is "SCHEDULED" or "COMPLETED" or "CANCELLED","Trạng thái chuyến bay không hợp lệ.");
+        return new ArrayList(dao.GetFlights());
     }
-    public static void ValidateFlightChange(FlightEdit f,FlightManagementDTO old,bool hasBookings,IReadOnlyList<string> activeSeats)
+
+    public ArrayList Fares(int? flightId = null)
     {
-        ValidateFlight(f);var o=old.Flight;
-        Require(old.TicketsSold>=0&&o.SeatsAvailable>=0&&o.TotalSeats==old.TicketsSold+o.SeatsAvailable&&old.TicketsSold==activeSeats.Count,"Số ghế và vé hiệu lực không khớp. Cần kiểm tra dữ liệu trước khi sửa.");
-        if(hasBookings)Require(f.DepartureAirportId==o.DepartureAirportId&&f.ArrivalAirportId==o.ArrivalAirportId&&f.DepartureDate==o.DepartureDate&&f.DepartureTime==o.DepartureTime&&f.ArrivalDate==o.ArrivalDate&&f.ArrivalTime==o.ArrivalTime&&f.Status==o.Status,
-            "Chuyến đã có Booking/vé: không đổi tuyến, lịch hoặc trạng thái. Cần quy trình xử lý vé riêng.");
-        Require(f.TotalSeats>=old.TicketsSold,"Tổng ghế không được nhỏ hơn số vé hiệu lực.");
-        if(f.TotalSeats<o.TotalSeats)
-            foreach(var seat in activeSeats)
+        return new ArrayList(dao.GetFares(flightId));
+    }
+
+    public static AirportDTO ValidateAirport(AirportDTO input)
+    {
+        string airportName = (input.AirportName ?? "").Trim();
+        if (airportName.Length == 0 || airportName.Length > 150)
+        {
+            throw new ManagementException("Tên sân bay bắt buộc, tối đa 150 ký tự.");
+        }
+        string city = (input.City ?? "").Trim();
+        if (city.Length == 0 || city.Length > 100)
+        {
+            throw new ManagementException("Thành phố bắt buộc, tối đa 100 ký tự.");
+        }
+        return new AirportDTO(input.AirportId, airportName, city);
+    }
+
+    public int SaveAirport(AirportDTO input, AirportDTO? original = null)
+    {
+        // Giữ API cũ cho các nơi đang gọi Save; mỗi nghiệp vụ có hàm riêng bên dưới.
+        if (input.AirportId == 0) return AddAirport(input);
+        return UpdateAirport(input, original);
+    }
+
+    public int AddAirport(AirportDTO input)
+    {
+        // 1. Chuẩn hóa và kiểm tra DTO trước khi truy cập SQL Server.
+        AirportDTO airport = ValidateAirport(input);
+        if (airport.AirportId != 0)
+        {
+            throw new ManagementException("Mã sân bay không hợp lệ.");
+        }
+        return dao.InTransaction(data =>
+        {
+            // 2. Kiểm tra trùng và thêm trong cùng transaction để tránh hai người thêm trùng.
+            if (data.AirportDuplicate(airport))
             {
-                var match=Regex.Match(seat,@"^([1-9][0-9]*)([A-F])$",RegexOptions.IgnoreCase);
-                Require(match.Success&&int.TryParse(match.Groups[1].Value,out var row)&&row<=(int.MaxValue-6)/6,"Không xác định được vị trí ghế đã cấp; chưa thể giảm tổng ghế.");
-                var index=((long)int.Parse(match.Groups[1].Value)-1)*6+char.ToUpperInvariant(match.Groups[2].Value[0])-'A'+1;
-                Require(index<=f.TotalSeats,$"Không thể giảm tổng ghế vì ghế {seat} đã được cấp.");
+                throw new ManagementException("Đã có sân bay cùng tên và thành phố.");
             }
+            // 3. DAO INSERT và trả ID mới; DAO chỉ trả kết quả sau khi commit thành công.
+            return data.InsertAirport(airport);
+        });
     }
-    public int SaveFlight(FlightEdit f,FlightManagementDTO? original=null)
+
+    public int UpdateAirport(AirportDTO input, AirportDTO? original)
     {
-        ValidateFlight(f);
-        return Database(()=>dao.Write(d=>{
-            var sold=0;
-            if(f.FlightId>0)
+        AirportDTO airport = ValidateAirport(input);
+        if (airport.AirportId <= 0)
+        {
+            throw new ManagementException("Mã sân bay không hợp lệ.");
+        }
+        return dao.InTransaction(data =>
+        {
+            // Khóa và so sánh với dòng đã chọn, không ghi đè thay đổi của người khác.
+            if (original == null || data.Airport(airport.AirportId, true) != original)
             {
-                var current=d.Flight(f.FlightId,true);
-                Require(current is not null&&original is not null&&current==original,"Chuyến bay/số ghế đã thay đổi. Hãy tải lại và chọn lại dòng.");
-                ValidateFlightChange(f,current!,d.FlightHasBookings(f.FlightId),d.ActiveSeats(f.FlightId));sold=current!.TicketsSold;
+                throw new ManagementException("Sân bay đã thay đổi. Hãy tải lại rồi chọn lại dòng.");
             }
-            Require(d.Airport(f.DepartureAirportId) is not null&&d.Airport(f.ArrivalAirportId) is not null,"Sân bay không tồn tại.");
-            return d.SaveFlight(f,sold);
-        }));
-    }
-    public void DeleteFlight(FlightManagementDTO original)=>Database(()=>dao.Write(d=>{
-        Require(d.Flight(original.Flight.FlightId,true)==original,"Chuyến bay đã thay đổi. Hãy tải lại.");
-        Require(!d.FlightHasBookings(original.Flight.FlightId)&&!d.FlightHasFares(original.Flight.FlightId),"Không xóa chuyến đã có hạng vé, Booking hoặc vé. Không tự xóa dữ liệu liên quan.");
-        d.DeleteFlight(original.Flight.FlightId);return 0;
-    }));
-    public static FareClassDTO ValidateFare(FareClassDTO f)
-    {
-        Require(f.FareId>=0&&f.FlightId>0,"Chọn chuyến bay hợp lệ.");
-        Require(f.Price>=0&&f.Price<=9999999999999999.99m&&decimal.Round(f.Price,2)==f.Price,"Giá vé phải không âm, tối đa 2 chữ số thập phân và trong giới hạn SQL.");
-        Require(f.BaseBaggageKg>=0,"Hành lý phải không âm.");return f with{ClassName=Text(f.ClassName,50,"Tên hạng vé")};
-    }
-    public int SaveFare(FareClassDTO input,FareClassDTO? original=null)
-    {
-        var f=ValidateFare(input);
-        return Database(()=>dao.Write(d=>{
-            foreach(var id in new[]{original?.FlightId??f.FlightId,f.FlightId}.Distinct().Order())
-                Require(d.Flight(id,true) is not null,"Chuyến bay không tồn tại.");
-            if(f.FareId>0)
+            if (data.AirportDuplicate(airport))
             {
-                Require(original is not null&&d.Fare(f.FareId)==original,"Hạng vé đã thay đổi. Hãy tải lại.");
-                Require(original!.FlightId==f.FlightId||!d.FareUsed(f.FareId),"Không chuyển hạng đã có vé sang chuyến khác.");
+                throw new ManagementException("Đã có sân bay cùng tên và thành phố.");
             }
-            Require(!d.FareDuplicate(f),"Tên hạng vé đã tồn tại trên chuyến này.");return d.SaveFare(f);
-        }));
+            return data.UpdateAirport(airport);
+        });
     }
-    public void DeleteFare(FareClassDTO original)=>Database(()=>dao.Write(d=>{
-        Require(d.Flight(original.FlightId,true) is not null&&d.Fare(original.FareId)==original,"Hạng vé đã thay đổi. Hãy tải lại.");
-        Require(!d.FareUsed(original.FareId),"Không xóa hạng vé đã được vé tham chiếu.");d.DeleteFare(original.FareId);return 0;
-    }));
+
+    public void DeleteAirport(AirportDTO original)
+    {
+        dao.InTransaction(data =>
+        {
+            if (data.Airport(original.AirportId, true) != original)
+            {
+                throw new ManagementException("Sân bay đã thay đổi. Hãy tải lại.");
+            }
+            if (data.AirportUsed(original.AirportId))
+            {
+                throw new ManagementException("Không xóa sân bay đang được chuyến bay sử dụng.");
+            }
+            data.DeleteAirport(original.AirportId);
+        });
+    }
+
+    public static void ValidateFlight(FlightEdit flight)
+    {
+        if (flight.FlightId < 0 || flight.DepartureAirportId <= 0 || flight.ArrivalAirportId <= 0 ||
+            flight.DepartureAirportId == flight.ArrivalAirportId)
+        {
+            throw new ManagementException("Chọn hai sân bay đi/đến khác nhau.");
+        }
+        if (flight.TotalSeats <= 0)
+        {
+            throw new ManagementException("Tổng số ghế phải lớn hơn 0.");
+        }
+        DateTime departure = flight.DepartureDate.ToDateTime(flight.DepartureTime);
+        DateTime arrival = flight.ArrivalDate.ToDateTime(flight.ArrivalTime);
+        if (arrival <= departure)
+        {
+            throw new ManagementException("Ngày giờ đến phải sau ngày giờ đi.");
+        }
+        if (flight.Status != "SCHEDULED" && flight.Status != "COMPLETED" && flight.Status != "CANCELLED")
+        {
+            throw new ManagementException("Trạng thái chuyến bay không hợp lệ.");
+        }
+    }
+
+    public static void ValidateFlightChange(FlightEdit flight, FlightManagementDTO old,
+        bool hasBookings, IReadOnlyList<string> activeSeats)
+    {
+        ValidateFlight(flight);
+        FlightDTO original = old.Flight;
+        bool countersMatch = old.TicketsSold >= 0 && original.SeatsAvailable >= 0 &&
+            original.TotalSeats == old.TicketsSold + original.SeatsAvailable && old.TicketsSold == activeSeats.Count;
+        if (!countersMatch)
+        {
+            throw new ManagementException("Số ghế và vé hiệu lực không khớp. Cần kiểm tra dữ liệu trước khi sửa.");
+        }
+
+        if (hasBookings)
+        {
+            bool routeUnchanged = flight.DepartureAirportId == original.DepartureAirportId &&
+                flight.ArrivalAirportId == original.ArrivalAirportId;
+            bool scheduleUnchanged = flight.DepartureDate == original.DepartureDate &&
+                flight.DepartureTime == original.DepartureTime && flight.ArrivalDate == original.ArrivalDate &&
+                flight.ArrivalTime == original.ArrivalTime;
+            if (!routeUnchanged || !scheduleUnchanged || flight.Status != original.Status)
+            {
+                throw new ManagementException("Chuyến đã có Booking/vé: không đổi tuyến, lịch hoặc trạng thái. Cần quy trình xử lý vé riêng.");
+            }
+        }
+        if (flight.TotalSeats < old.TicketsSold)
+        {
+            throw new ManagementException("Tổng ghế không được nhỏ hơn số vé hiệu lực.");
+        }
+
+        if (flight.TotalSeats < original.TotalSeats)
+        {
+            foreach (string seat in activeSeats)
+            {
+                Match match = Regex.Match(seat, @"^([1-9][0-9]*)([A-F])$", RegexOptions.IgnoreCase);
+                if (!match.Success || !int.TryParse(match.Groups[1].Value, out int row) || row > (int.MaxValue - 6) / 6)
+                    throw new ManagementException("Không xác định được vị trí ghế đã cấp; chưa thể giảm tổng ghế.");
+
+                // Sáu ghế A–F mỗi hàng, cùng quy ước cấp ghế của Booking.
+                long seatIndex = ((long)row - 1) * 6 + char.ToUpperInvariant(match.Groups[2].Value[0]) - 'A' + 1;
+                if (seatIndex > flight.TotalSeats)
+                {
+                    throw new ManagementException($"Không thể giảm tổng ghế vì ghế {seat} đã được cấp.");
+                }
+            }
+        }
+    }
+
+    public int SaveFlight(FlightEdit flight, FlightManagementDTO? original = null)
+    {
+        if (flight.FlightId == 0) return AddFlight(flight);
+        return UpdateFlight(flight, original);
+    }
+
+    public int AddFlight(FlightEdit flight)
+    {
+        ValidateFlight(flight);
+        if (flight.FlightId != 0)
+        {
+            throw new ManagementException("Mã chuyến bay phải bằng 0 khi thêm mới.");
+        }
+        return dao.InTransaction(data =>
+        {
+            if (data.Airport(flight.DepartureAirportId) == null || data.Airport(flight.ArrivalAirportId) == null)
+            {
+                throw new ManagementException("Sân bay không tồn tại.");
+            }
+            // Chuyến mới chưa bán vé; DAO khởi tạo ghế còn và doanh thu đúng nghiệp vụ.
+            return data.InsertFlight(flight, 0);
+        });
+    }
+
+    public int UpdateFlight(FlightEdit flight, FlightManagementDTO? original)
+    {
+        // 1. Kiểm tra tuyến, lịch, tổng ghế và trạng thái của DTO.
+        ValidateFlight(flight);
+        if (flight.FlightId == 0)
+        {
+            throw new ManagementException("Mã chuyến bay phải lớn hơn 0 khi chỉnh sửa.");
+        }
+        return dao.InTransaction(data =>
+        {
+            // 2. Khóa chuyến và kiểm tra snapshot trước khi đọc vé/ghế liên quan.
+            FlightManagementDTO? current = data.Flight(flight.FlightId, true);
+            if (current == null || original == null || current != original)
+            {
+                throw new ManagementException("Chuyến bay/số ghế đã thay đổi. Hãy tải lại và chọn lại dòng.");
+            }
+            // 3. Đối chiếu Booking, bộ đếm và vị trí ghế đã cấp trong chính transaction này.
+            bool hasBookings = data.FlightHasBookings(flight.FlightId);
+            List<string> activeSeats = data.ActiveSeats(flight.FlightId);
+            ValidateFlightChange(flight, current, hasBookings, activeSeats);
+            if (data.Airport(flight.DepartureAirportId) == null || data.Airport(flight.ArrivalAirportId) == null)
+            {
+                throw new ManagementException("Sân bay không tồn tại.");
+            }
+            // 4. Chỉ cập nhật sau khi tất cả điều kiện hợp lệ; không sửa giá lịch sử/doanh thu.
+            return data.UpdateFlight(flight, current.TicketsSold);
+        });
+    }
+
+    public void DeleteFlight(FlightManagementDTO original)
+    {
+        dao.InTransaction(data =>
+        {
+            int flightId = original.Flight.FlightId;
+            if (data.Flight(flightId, true) != original)
+            {
+                throw new ManagementException("Chuyến bay đã thay đổi. Hãy tải lại.");
+            }
+            if (data.FlightHasBookings(flightId) || data.FlightHasFares(flightId))
+            {
+                throw new ManagementException("Không xóa chuyến đã có hạng vé, Booking hoặc vé. Không tự xóa dữ liệu liên quan.");
+            }
+            data.DeleteFlight(flightId);
+        });
+    }
+
+    public static FareClassDTO ValidateFare(FareClassDTO input)
+    {
+        if (input.FareId < 0 || input.FlightId <= 0)
+        {
+            throw new ManagementException("Chọn chuyến bay hợp lệ.");
+        }
+        if (input.Price < 0 || input.Price > 9999999999999999.99m || decimal.Round(input.Price, 2) != input.Price)
+        {
+            throw new ManagementException("Giá vé phải không âm, tối đa 2 chữ số thập phân và trong giới hạn SQL.");
+        }
+        if (input.BaseBaggageKg < 0)
+        {
+            throw new ManagementException("Hành lý phải không âm.");
+        }
+        string className = (input.ClassName ?? "").Trim();
+        if (className.Length == 0 || className.Length > 50)
+        {
+            throw new ManagementException("Tên hạng vé bắt buộc, tối đa 50 ký tự.");
+        }
+        return new FareClassDTO(input.FareId, input.FlightId, className, input.Price, input.BaseBaggageKg);
+    }
+
+    public int SaveFare(FareClassDTO input, FareClassDTO? original = null)
+    {
+        FareClassDTO fare = ValidateFare(input);
+        // Hạng vé có thể chuyển chuyến: giữ chung kiểm tra/khóa hai chuyến cho cả thêm và sửa.
+        return dao.InTransaction(data =>
+        {
+            int firstFlightId = fare.FlightId;
+            if (original != null) firstFlightId = original.FlightId;
+            int secondFlightId = fare.FlightId;
+            // Khóa theo ID tăng dần như Booking để hạn chế deadlock; không khóa lặp một chuyến.
+            if (firstFlightId > secondFlightId)
+            {
+                int temporaryId = firstFlightId;
+                firstFlightId = secondFlightId;
+                secondFlightId = temporaryId;
+            }
+            if (data.Flight(firstFlightId, true) == null)
+            {
+                throw new ManagementException("Chuyến bay không tồn tại.");
+            }
+            if (secondFlightId != firstFlightId)
+            {
+                if (data.Flight(secondFlightId, true) == null)
+                {
+                    throw new ManagementException("Chuyến bay không tồn tại.");
+                }
+            }
+
+            if (fare.FareId > 0)
+            {
+                if (original == null || data.Fare(fare.FareId) != original)
+                    throw new ManagementException("Hạng vé đã thay đổi. Hãy tải lại.");
+                if (original.FlightId != fare.FlightId && data.FareUsed(fare.FareId))
+                {
+                    throw new ManagementException("Không chuyển hạng đã có vé sang chuyến khác.");
+                }
+            }
+            if (data.FareDuplicate(fare))
+            {
+                throw new ManagementException("Tên hạng vé đã tồn tại trên chuyến này.");
+            }
+            return data.SaveFare(fare);
+        });
+    }
+
+    public void DeleteFare(FareClassDTO original)
+    {
+        dao.InTransaction(data =>
+        {
+            // 1. Khóa chuyến, xác minh hạng vẫn giống snapshot đã chọn.
+            if (data.Flight(original.FlightId, true) == null || data.Fare(original.FareId) != original)
+            {
+                throw new ManagementException("Hạng vé đã thay đổi. Hãy tải lại.");
+            }
+            // 2. Hạng đã có vé tham chiếu không được xóa.
+            if (data.FareUsed(original.FareId))
+            {
+                throw new ManagementException("Không xóa hạng vé đã được vé tham chiếu.");
+            }
+            // 3. DAO xóa và commit; lỗi ở bất kỳ bước nào sẽ không trả thành công.
+            data.DeleteFare(original.FareId);
+        });
+    }
 }
 
 public static class ManagementSearch
 {
-    public static readonly string[] AirportFields=["Mã","Tên","Thành phố"];
-    public static readonly string[] FlightFields=["Mã","Nơi đi","Nơi đến","Ngày đi","Ngày đến","Tổng ghế","Đã bán","Còn ghế","Doanh thu","Trạng thái"];
-    public static readonly string[] FareFields=["Mã","Chuyến","Tên","Giá","Hành lý"];
-    private static object Value(object item,string field)=>item switch
+    public static readonly string[] AirportFields = { "Mã", "Tên", "Thành phố" };
+    public static readonly string[] FlightFields =
     {
-        AirportDTO a=>field switch{"Mã"=>a.AirportId,"Tên"=>a.AirportName,"Thành phố"=>a.City,_=>throw new ManagementException("Trường lọc không hợp lệ.")},
-        FlightManagementDTO m=>field switch{"Mã"=>m.Flight.FlightId,"Nơi đi"=>m.Flight.DepartureCity,"Nơi đến"=>m.Flight.ArrivalCity,"Ngày đi"=>m.Flight.DepartureDate,"Ngày đến"=>m.Flight.ArrivalDate,"Tổng ghế"=>m.Flight.TotalSeats,"Đã bán"=>m.TicketsSold,"Còn ghế"=>m.Flight.SeatsAvailable,"Doanh thu"=>m.TotalRevenue,"Trạng thái"=>m.Flight.Status,_=>throw new ManagementException("Trường lọc không hợp lệ.")},
-        FareClassDTO f=>field switch{"Mã"=>f.FareId,"Chuyến"=>f.FlightId,"Tên"=>f.ClassName,"Giá"=>f.Price,"Hành lý"=>f.BaseBaggageKg,_=>throw new ManagementException("Trường lọc không hợp lệ.")},
-        _=>throw new ManagementException("Loại dữ liệu không hợp lệ.")
+        "Mã", "Nơi đi", "Nơi đến", "Ngày đi", "Ngày đến", "Tổng ghế",
+        "Đã bán", "Còn ghế", "Doanh thu", "Trạng thái"
     };
-    public static ArrayList Filter(ArrayList source,IReadOnlyList<ManagementFilter> filters,string join="AND",bool not=false)
+    public static readonly string[] FareFields = { "Mã", "Chuyến", "Tên", "Giá", "Hành lý" };
+
+    private static object Value(object? item, string field)
     {
-        if(join is not("AND" or "OR"))throw new ManagementException("Chọn AND hoặc OR.");
-        var predicates=filters.Where(f=>!string.IsNullOrWhiteSpace(f.Value)).ToArray();
-        foreach(var f in predicates)if(f.Operator is not("=" or "<>" or ">" or ">=" or "<" or "<=" or "chứa"))throw new ManagementException("Phép so sánh không hợp lệ.");
-        var result=new ArrayList();
-        foreach(var item in source)
+        if (item is AirportDTO airport)
         {
-            var values=predicates.Select(f=>Match(Value(item!,f.Field),f)).ToArray();
-            var yes=values.Length==0||(join=="AND"?values.All(x=>x):values.Any(x=>x));
-            if(values.Length>0&&not)yes=!yes;if(yes)result.Add(item);
+            switch (field)
+            {
+                case "Mã": return airport.AirportId;
+                case "Tên": return airport.AirportName;
+                case "Thành phố": return airport.City;
+                default: throw new ManagementException("Trường lọc không hợp lệ.");
+            }
+        }
+        if (item is FlightManagementDTO managedFlight)
+        {
+            FlightDTO flight = managedFlight.Flight;
+            switch (field)
+            {
+                case "Mã": return flight.FlightId;
+                case "Nơi đi": return flight.DepartureCity;
+                case "Nơi đến": return flight.ArrivalCity;
+                case "Ngày đi": return flight.DepartureDate;
+                case "Ngày đến": return flight.ArrivalDate;
+                case "Tổng ghế": return flight.TotalSeats;
+                case "Đã bán": return managedFlight.TicketsSold;
+                case "Còn ghế": return flight.SeatsAvailable;
+                case "Doanh thu": return managedFlight.TotalRevenue;
+                case "Trạng thái": return flight.Status;
+                default: throw new ManagementException("Trường lọc không hợp lệ.");
+            }
+        }
+        if (item is FareClassDTO fare)
+        {
+            switch (field)
+            {
+                case "Mã": return fare.FareId;
+                case "Chuyến": return fare.FlightId;
+                case "Tên": return fare.ClassName;
+                case "Giá": return fare.Price;
+                case "Hành lý": return fare.BaseBaggageKg;
+                default: throw new ManagementException("Trường lọc không hợp lệ.");
+            }
+        }
+        throw new ManagementException("Loại dữ liệu không hợp lệ.");
+    }
+
+    public static ArrayList Filter(ArrayList source, IReadOnlyList<ManagementFilter> filters,
+        string join = "AND", bool not = false)
+    {
+        if (join != "AND" && join != "OR")
+            throw new ManagementException("Chọn AND hoặc OR.");
+
+        // Chỉ dùng điều kiện có nhập giá trị; không sửa danh sách dữ liệu gốc.
+        List<ManagementFilter> conditions = new List<ManagementFilter>();
+        foreach (ManagementFilter filter in filters)
+        {
+            if (string.IsNullOrWhiteSpace(filter.Value)) continue;
+            switch (filter.Operator)
+            {
+                case "=": case "<>": case ">": case ">=": case "<": case "<=": case "chứa":
+                    conditions.Add(filter);
+                    break;
+                default:
+                    throw new ManagementException("Phép so sánh không hợp lệ.");
+            }
+        }
+
+        ArrayList result = new ArrayList();
+        foreach (object? item in source)
+        {
+            bool matches = join == "AND";
+            foreach (ManagementFilter condition in conditions)
+            {
+                object actualValue = Value(item, condition.Field);
+                bool matchesCondition = Match(actualValue, condition);
+
+                // Vẫn kiểm tra mọi điều kiện để không bỏ qua giá trị nhập sai ở điều kiện sau.
+                if (join == "AND")
+                {
+                    if (!matchesCondition) matches = false;
+                }
+                else
+                {
+                    if (matchesCondition) matches = true;
+                }
+            }
+            if (conditions.Count == 0) matches = true;
+            if (conditions.Count > 0 && not) matches = !matches;
+            if (matches) result.Add(item);
         }
         return result;
     }
-    private static bool Match(object value,ManagementFilter f)
+
+    private static bool Match(object value, ManagementFilter filter)
     {
-        var text=f.Value.Trim();int comparison;
-        if(value is string s)
-        {if(f.Operator=="chứa")return s.Contains(text,StringComparison.OrdinalIgnoreCase);comparison=string.Compare(s,text,StringComparison.OrdinalIgnoreCase);}
-        else if(value is DateOnly date)
+        string text = filter.Value.Trim();
+        int comparison;
+        if (value is string actualText)
         {
-            if(!DateOnly.TryParseExact(text,["dd/MM/yyyy","yyyy-MM-dd"],CultureInfo.InvariantCulture,DateTimeStyles.None,out var target))throw new ManagementException("Ngày lọc dùng dd/MM/yyyy hoặc yyyy-MM-dd.");
-            comparison=date.CompareTo(target);
+            if (filter.Field == "Trạng thái")
+            {
+                // Tìm theo nhãn Việt đang thấy trên ListView hoặc theo mã lưu trong SQL.
+                string label = actualText;
+                if (actualText == "SCHEDULED") label = "Mở bán";
+                else if (actualText == "COMPLETED") label = "Đã hoàn thành";
+                else if (actualText == "CANCELLED") label = "Đã hủy";
+
+                if (filter.Operator == "chứa")
+                    return label.Contains(text, StringComparison.OrdinalIgnoreCase) ||
+                        actualText.Contains(text, StringComparison.OrdinalIgnoreCase);
+
+                string normalized = text.ToUpperInvariant();
+                if (normalized == "MỞ BÁN") text = "SCHEDULED";
+                else if (normalized == "ĐÃ HOÀN THÀNH") text = "COMPLETED";
+                else if (normalized == "ĐÃ HỦY") text = "CANCELLED";
+            }
+            if (filter.Operator == "chứa")
+                return actualText.Contains(text, StringComparison.OrdinalIgnoreCase);
+            comparison = string.Compare(actualText, text, StringComparison.OrdinalIgnoreCase);
+        }
+        else if (value is DateOnly date)
+        {
+            string[] formats = { "dd/MM/yyyy", "yyyy-MM-dd" };
+            if (!DateOnly.TryParseExact(text, formats, CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out DateOnly target))
+                throw new ManagementException("Ngày lọc dùng dd/MM/yyyy hoặc yyyy-MM-dd.");
+            comparison = date.CompareTo(target);
         }
         else
         {
-            if(!decimal.TryParse(text,NumberStyles.Number,CultureInfo.GetCultureInfo("vi-VN"),out var number))throw new ManagementException("Giá trị lọc phải là số, ví dụ 1.000.000.");
-            comparison=Convert.ToDecimal(value).CompareTo(number);
+            // Không để TryParse bỏ dấu phân nhóm sai, ví dụ đọc 1.5 thành 15.
+            bool validFormat = Regex.IsMatch(text, @"^[+-]?(?:[0-9]+|[0-9]{1,3}(?:\.[0-9]{3})+)(?:,[0-9]+)?$");
+            if (!validFormat || !decimal.TryParse(text, NumberStyles.Number,
+                    CultureInfo.GetCultureInfo("vi-VN"), out decimal number))
+                throw new ManagementException("Giá trị lọc phải là số, ví dụ 1.000.000 hoặc 1,5.");
+            comparison = Convert.ToDecimal(value).CompareTo(number);
         }
-        return f.Operator switch{"="=>comparison==0,"<>"=>comparison!=0,">"=>comparison>0,">="=>comparison>=0,"<"=>comparison<0,"<="=>comparison<=0,_=>throw new ManagementException("Phép chứa chỉ dùng cho văn bản.")};
+
+        switch (filter.Operator)
+        {
+            case "=": return comparison == 0;
+            case "<>": return comparison != 0;
+            case ">": return comparison > 0;
+            case ">=": return comparison >= 0;
+            case "<": return comparison < 0;
+            case "<=": return comparison <= 0;
+            default: throw new ManagementException("Phép chứa chỉ dùng cho văn bản.");
+        }
     }
 }
