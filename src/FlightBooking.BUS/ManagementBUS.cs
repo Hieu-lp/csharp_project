@@ -137,7 +137,18 @@ public static class ManagementSearch
     {
         var text=f.Value.Trim();int comparison;
         if(value is string s)
-        {if(f.Operator=="chứa")return s.Contains(text,StringComparison.OrdinalIgnoreCase);comparison=string.Compare(s,text,StringComparison.OrdinalIgnoreCase);}
+        {
+            if (f.Field == "Trạng thái")
+            {
+                // Người dùng tìm theo nhãn đang thấy trên ListView hoặc theo mã SQL.
+                var label = s switch { "SCHEDULED" => "Mở bán", "COMPLETED" => "Đã hoàn thành", "CANCELLED" => "Đã hủy", _ => s };
+                if (f.Operator == "chứa")
+                    return label.Contains(text, StringComparison.OrdinalIgnoreCase) || s.Contains(text, StringComparison.OrdinalIgnoreCase);
+                text = text.ToUpperInvariant() switch { "MỞ BÁN" => "SCHEDULED", "ĐÃ HOÀN THÀNH" => "COMPLETED", "ĐÃ HỦY" => "CANCELLED", _ => text };
+            }
+            if(f.Operator=="chứa")return s.Contains(text,StringComparison.OrdinalIgnoreCase);
+            comparison=string.Compare(s,text,StringComparison.OrdinalIgnoreCase);
+        }
         else if(value is DateOnly date)
         {
             if(!DateOnly.TryParseExact(text,["dd/MM/yyyy","yyyy-MM-dd"],CultureInfo.InvariantCulture,DateTimeStyles.None,out var target))throw new ManagementException("Ngày lọc dùng dd/MM/yyyy hoặc yyyy-MM-dd.");
@@ -145,7 +156,10 @@ public static class ManagementSearch
         }
         else
         {
-            if(!decimal.TryParse(text,NumberStyles.Number,CultureInfo.GetCultureInfo("vi-VN"),out var number))throw new ManagementException("Giá trị lọc phải là số, ví dụ 1.000.000.");
+            // TryParse tự bỏ cả dấu phân nhóm sai (ví dụ 1.5 thành 15), nên kiểm tra định dạng trước.
+            if(!Regex.IsMatch(text, @"^[+-]?(?:[0-9]+|[0-9]{1,3}(?:\.[0-9]{3})+)(?:,[0-9]+)?$") ||
+                !decimal.TryParse(text,NumberStyles.Number,CultureInfo.GetCultureInfo("vi-VN"),out var number))
+                throw new ManagementException("Giá trị lọc phải là số, ví dụ 1.000.000 hoặc 1,5.");
             comparison=Convert.ToDecimal(value).CompareTo(number);
         }
         return f.Operator switch{"="=>comparison==0,"<>"=>comparison!=0,">"=>comparison>0,">="=>comparison>=0,"<"=>comparison<0,"<="=>comparison<=0,_=>throw new ManagementException("Phép chứa chỉ dùng cho văn bản.")};

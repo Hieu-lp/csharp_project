@@ -9,5 +9,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/FlightBooking.ManagementChecks/FlightBooking.ManagementChecks.csproj" />
     <Project Path="tests/FlightBooking.Checks/FlightBooking.Checks.csproj" />
+    <Project Path="tests/FlightBooking.WinFormsChecks/FlightBooking.WinFormsChecks.csproj" />
   </Folder>
 </Solution>

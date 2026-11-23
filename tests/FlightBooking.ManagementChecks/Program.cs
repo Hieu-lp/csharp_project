@@ -36,6 +36,26 @@ foreach(var (op,count) in new[]{("=",1),("<>",1),(">",1),(">=",2),("<",0),("<=",
 Check(ManagementSearch.Filter(new(){new FlightManagementDTO(flight,1,100)},[new("Ngày đến","=","01/01/2027")]).Count==1,"date predicate");
 Check(ManagementSearch.Filter(new(){new FareClassDTO(1,1,"Eco",1000000,7)},[new("Giá",">=","1.000.000")]).Count==1,"Vietnamese money predicate");
 Reject(()=>ManagementSearch.Filter(rows,[new("Mã","=","not a number")]),"invalid filter number");
+var statusRows = new ArrayList
+{
+    new FlightManagementDTO(flight, 1, 100),
+    new FlightManagementDTO(flight with { FlightId = 2, Status = "COMPLETED" }, 1, 100),
+    new FlightManagementDTO(flight with { FlightId = 3, Status = "CANCELLED" }, 1, 100)
+};
+foreach (var (label, id) in new[] { ("Mở bán", 1), ("Đã hoàn thành", 2), ("Đã hủy", 3), ("SCHEDULED", 1) })
+{
+    var result = ManagementSearch.Filter(statusRows, [new("Trạng thái", "=", label)]);
+    Check(result.Count == 1 && ((FlightManagementDTO)result[0]!).Flight.FlightId == id, "Vietnamese/SQL status " + label);
+}
+Check(ManagementSearch.Filter(statusRows, [new("Trạng thái", "chứa", "hoàn thành")]).Count == 1, "status contains displayed text");
+Check(ManagementSearch.Filter(statusRows, [new("Trạng thái", "<>", "Đã hủy"), new("Mã", ">=", "2")]).Count == 1, "status and numeric AND");
+Check(ManagementSearch.Filter(statusRows, [new("Trạng thái", "=", "Mở bán"), new("Mã", "=", "3")], "OR", true).Count == 1, "NOT over OR status conditions");
+foreach (var invalid in new[] { "1.5", "1.00.000", "1..000", "1,2,3", "1e3" })
+    Reject(() => ManagementSearch.Filter(rows, [new("Mã", "=", invalid)]), "reject malformed Vietnamese number " + invalid);
+Check(ManagementSearch.Filter(rows, [new("Mã", ">", "1,5")]).Count == 1, "Vietnamese decimal comparison");
+Check(ManagementSearch.Filter(rows, [new("Mã", ">", "-1")]).Count == 2, "negative numeric threshold");
+Check(ManagementSearch.Filter(rows, [new("Mã", ">", "1"), new("Mã", "<", "3")]).Count == 1, "range on same field");
+Check(ManagementSearch.Filter(rows, [], not: true).Count == 2, "empty filters keep all rows with NOT");
 var editor = new FlightBooking.WinForms.EditorSession();
 editor.Begin(FlightBooking.WinForms.EditorMode.View,"saved");
 Check(!editor.IsDirty("changed")&&!editor.CanSave("changed"),"view mode never edits or saves");

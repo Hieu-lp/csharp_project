@@ -59,6 +59,12 @@ public sealed class ManagementPage : UserControl
         // Parent tabs briefly have a tiny size during construction; apply layout after mounting.
         split.Panel1.Controls.Add(BuildLists()); split.Panel2.Controls.Add(BuildEditor());
         Controls.Add(root);
+        split.SizeChanged += (_, _) =>
+        {
+            // Tab có thể co rất nhỏ khi khởi tạo; khôi phục vùng chi tiết khi đã có đủ chỗ.
+            if (split.Width > 760 && split.Panel2.Width < 360)
+                split.SplitterDistance = Math.Max(360, split.Width - 430);
+        };
         list.SelectedIndexChanged += (_, _) => SelectionChanged();
         foreach (var c in fields.Values)
         {
@@ -272,11 +278,12 @@ public sealed class ManagementPage : UserControl
         string[] keys = message switch
         {
             var s when s.Contains("Tên sân bay") => ["name"], var s when s.Contains("Thành phố") => ["city"],
+            var s when kind == CatalogKind.Airport && s.Contains("cùng tên và thành phố", StringComparison.OrdinalIgnoreCase) => ["name", "city"],
             var s when s.Contains("tên hạng", StringComparison.OrdinalIgnoreCase) || s.Contains("hạng vé đã tồn tại") => ["name"],
             var s when s.Contains("Giá vé") => ["price"], var s when s.Contains("Hành lý") => ["kg"],
             var s when s.Contains("ghế", StringComparison.OrdinalIgnoreCase) => ["total"], var s when s.Contains("Ngày giờ") => ["ad", "at"],
             var s when s.Contains("sân bay", StringComparison.OrdinalIgnoreCase) => ["from", "to"],
-            var s when s.Contains("Chuyến bay không tồn tại") => ["flight"], _ => []
+            var s when kind == CatalogKind.Fare && s.Contains("chuyến bay", StringComparison.OrdinalIgnoreCase) => ["flight"], _ => []
         };
         foreach (var key in keys) if (fields.TryGetValue(key, out var control)) errors.SetError(control, message);
     }
@@ -510,9 +517,20 @@ public sealed class ManagementPage : UserControl
     }
     public async Task ShowFares(int flightId)
     {
-        await EnsureLoaded(); if (IsDisposed || !loaded || !CanLeave()) return;
-        scopeFlight = flightId; binding = true; fareScope.SelectedValue = flightId; binding = false;
-        ResetView(null); Render();
+        // Lần mở tab đầu tiên có thể đã bắt đầu tải từ VisibleChanged.
+        if (loading is { IsCompleted: false }) await loading;
+        if (IsDisposed || !CanLeave()) return;
+        await Run(async () =>
+        {
+            // Tab có thể đã tải trước khi chuyến/hạng được thêm hoặc sửa ở nơi khác.
+            await ReadAll(); if (IsDisposed) return;
+            if (!flights.Cast<FlightManagementDTO>().Any(m => m.Flight.FlightId == flightId))
+                throw new ManagementException("Chuyến bay không còn tồn tại. Hãy tải lại và chọn chuyến khác.");
+            scopeFlight = flightId; binding = true;
+            try { fareScope.SelectedValue = flightId; }
+            finally { binding = false; }
+            ResetView(null); Render();
+        }, "Đang tải hạng vé của chuyến…");
     }
     protected override void Dispose(bool disposing) { if (disposing) errors.Dispose(); base.Dispose(disposing); }
 }

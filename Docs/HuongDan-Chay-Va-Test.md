@@ -1,5 +1,14 @@
 # Hướng dẫn chạy và thao tác thử website cùng WinForms
 
+**Tiếp nối sau khi nhận tài liệu gốc:** xem [đối chiếu đủ 16 mục W7, so sánh
+QLSV3Lop, kiểm tra GUI và phương án database test](DoiChieu-W7-QLSV3Lop.md).
+
+**Kiểm tra trên máy hiện tại ngày 23/11/2026:** xem [báo cáo rà soát, lỗi đã sửa,
+kết quả test và lệnh chạy an toàn](RaSoat-BookingFlight-2026-11-23.md).
+Các đường dẫn, server, ID và trạng thái script 08 trong hướng dẫn cũ bên dưới là
+thông tin bàn giao của máy trước. Máy hiện tại thiếu BOOKING_WEB_REQUEST; không
+chạy seed/script 08 hoặc thử ghi dữ liệu vào database chính để làm theo ví dụ cũ.
+
 Cập nhật ngày 22/11/2026. Dành cho bản tích hợp trên nhánh
 `feature/flight-management` tại commit `debfa06`: có cả Booking của Thịnh và
 WinForms quản lý sân bay, chuyến bay, hạng vé của Hiếu.

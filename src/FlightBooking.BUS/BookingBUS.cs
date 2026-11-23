@@ -114,8 +114,15 @@ public sealed class BookingBUS(string connectionString, TimeProvider? clock = nu
             if (search.Price is decimal price)
             {
                 var comparison = offer.Fare.Price.CompareTo(price);
-                conditions.Add(search.Operator switch { "=" => comparison == 0, "<>" => comparison != 0,
-                    ">" => comparison > 0, ">=" => comparison >= 0, "<" => comparison < 0, _ => comparison <= 0 });
+                conditions.Add(search.Operator switch
+                {
+                    "=" => comparison == 0,
+                    "<>" => comparison != 0,
+                    ">" => comparison > 0,
+                    ">=" => comparison >= 0,
+                    "<" => comparison < 0,
+                    _ => comparison <= 0
+                });
             }
             if (className.Length > 0)
                 conditions.Add(offer.Fare.ClassName.Contains(className, StringComparison.OrdinalIgnoreCase));
@@ -208,8 +215,19 @@ public sealed class BookingBUS(string connectionString, TimeProvider? clock = nu
     {
         Validate(request, DateOnly.FromDateTime(Now));
         var hash = HashKey(accessKey);
-        var payloadHash = Hash(JsonSerializer.Serialize(new { request.FlightId, request.FareId, request.Quantity, request.TripType,
-            request.ReturnDate, request.ReturnFlightId, request.ReturnFareId, request.Customer, request.Passengers, request.DiscountCode }));
+        var payloadHash = Hash(JsonSerializer.Serialize(new
+        {
+            request.FlightId,
+            request.FareId,
+            request.Quantity,
+            request.TripType,
+            request.ReturnDate,
+            request.ReturnFlightId,
+            request.ReturnFareId,
+            request.Customer,
+            request.Passengers,
+            request.DiscountCode
+        }));
         return Database(() => dao.Write(d =>
         {
             d.LockRequest(hash);
