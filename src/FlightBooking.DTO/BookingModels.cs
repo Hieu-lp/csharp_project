@@ -17,10 +17,6 @@ public sealed record FlightSelectionDTO(BookingQuoteDTO Quote)
 {
     public bool HasSeats => Quote.Flight.SeatsAvailable >= Quote.Quantity;
 }
-public sealed record DiscountCodeDTO(int DiscountId, string Code, string Type, decimal Value,
-    decimal MinOrderAmount, decimal? MaxDiscountAmount, DateTime StartDate, DateTime EndDate,
-    int? UsageLimit, int UsedCount, string Status);
-
 public sealed class CustomerInput
 {
     [Required(ErrorMessage = "Nhập họ tên khách đặt."), StringLength(100, ErrorMessage = "Họ tên tối đa 100 ký tự.")]
