@@ -1,17 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-  <ItemGroup>
-    <ProjectReference Include="../../src/FlightBooking.BUS/FlightBooking.BUS.csproj" />
-    <ProjectReference Include="../../src/FlightBooking.DAO/FlightBooking.DAO.csproj" />
-    <ProjectReference Include="../../src/FlightBooking.DTO/FlightBooking.DTO.csproj" />
-    <Compile Include="../../src/FlightBooking.WinForms/EditorSession.cs" Link="EditorSession.cs" />
-  </ItemGroup>
-
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../src/FlightBooking.BUS/FlightBooking.BUS.csproj"/><ProjectReference Include="../../src/FlightBooking.DAO/FlightBooking.DAO.csproj"/></ItemGroup>
+  <ItemGroup><Compile Include="../../src/FlightBooking.WinForms/EditorSession.cs" Link="EditorSession.cs"/></ItemGroup>
 </Project>
