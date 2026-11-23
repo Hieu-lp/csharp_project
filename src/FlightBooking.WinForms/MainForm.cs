@@ -61,6 +61,7 @@ public sealed class MainForm : Form
         managementMenu.DropDownItems.Add("Khách hàng", null, (_, _) => OpenModule(new CustomerManagementForm()));
         managementMenu.DropDownItems.Add("Nhân viên", null, (_, _) => OpenModule(new EmployeeManagementForm()));
         managementMenu.DropDownItems.Add("Mã giảm giá", null, (_, _) => OpenModule(new DiscountCodeManagementForm()));
+        managementMenu.DropDownItems.Add("Sân bay / chuyến bay / hạng vé", null, (_, _) => OpenFlightManagement());
 
         var helpMenu = new ToolStripMenuItem("Trợ giúp");
         helpMenu.DropDownItems.Add("Giới thiệu", null, (_, _) =>
@@ -99,8 +100,15 @@ public sealed class MainForm : Form
         stack.Controls.Add(CreateNavigationButton("Quản lý khách hàng", (_, _) => OpenModule(new CustomerManagementForm())));
         stack.Controls.Add(CreateNavigationButton("Quản lý nhân viên", (_, _) => OpenModule(new EmployeeManagementForm())));
         stack.Controls.Add(CreateNavigationButton("Quản lý mã giảm giá", (_, _) => OpenModule(new DiscountCodeManagementForm())));
+        stack.Controls.Add(CreateNavigationButton("Quản lý chuyến bay", (_, _) => OpenFlightManagement()));
         sidebar.Controls.Add(stack);
         return sidebar;
+    }
+
+    private void OpenFlightManagement()
+    {
+        using var flightManagement = new Form1();
+        flightManagement.ShowDialog(this);
     }
 
     private static Button CreateNavigationButton(string text, EventHandler click)

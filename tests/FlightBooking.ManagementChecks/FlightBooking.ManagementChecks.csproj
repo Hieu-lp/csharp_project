@@ -2,7 +2,9 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/FlightBooking.BUS/FlightBooking.BUS.csproj" />
+    <ProjectReference Include="../../src/FlightBooking.DAO/FlightBooking.DAO.csproj" />
     <ProjectReference Include="../../src/FlightBooking.DTO/FlightBooking.DTO.csproj" />
+    <Compile Include="../../src/FlightBooking.WinForms/EditorSession.cs" Link="EditorSession.cs" />
   </ItemGroup>
 
   <PropertyGroup>
