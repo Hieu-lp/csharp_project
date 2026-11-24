@@ -3,9 +3,7 @@ using Microsoft.Data.SqlClient;
 namespace FlightBooking.DAO;
 
 /// <summary>
-/// Connection factory shared by the DAO layer.
-/// Booking passes its configured connection string; management DAOs read the
-/// FLIGHTBOOKING_DB_CONNECTION environment variable.
+/// Connection factory shared by booking, flight management, and customer-management DAOs.
 /// </summary>
 public sealed class MyConnection
 {
@@ -17,7 +15,7 @@ public sealed class MyConnection
         _connectionString = connectionString;
     }
 
-    /// <summary>Opens and returns a connection for BookingDAO, which owns its disposal.</summary>
+    /// <summary>Opens a connection using the explicitly supplied connection string.</summary>
     public SqlConnection Open()
     {
         if (string.IsNullOrWhiteSpace(_connectionString))
@@ -38,7 +36,7 @@ public sealed class MyConnection
         }
     }
 
-    /// <summary>Creates a closed connection for management DAOs from the environment variable.</summary>
+    /// <summary>Creates a closed connection for customer-management DAOs from the environment variable.</summary>
     public static SqlConnection CreateConnection()
     {
         string? connectionString = Environment.GetEnvironmentVariable(ConnectionStringEnvironmentVariable);

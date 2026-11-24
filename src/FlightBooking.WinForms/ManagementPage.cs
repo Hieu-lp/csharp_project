@@ -59,6 +59,12 @@ public sealed class ManagementPage : UserControl
         // Parent tabs briefly have a tiny size during construction; apply layout after mounting.
         split.Panel1.Controls.Add(BuildLists()); split.Panel2.Controls.Add(BuildEditor());
         Controls.Add(root);
+        split.SizeChanged += (_, _) =>
+        {
+            // Tab có thể co rất nhỏ khi khởi tạo; khôi phục vùng chi tiết khi đã có đủ chỗ.
+            if (split.Width > 760 && split.Panel2.Width < 360)
+                split.SplitterDistance = Math.Max(360, split.Width - 430);
+        };
         list.SelectedIndexChanged += (_, _) => SelectionChanged();
         foreach (var c in fields.Values)
         {
@@ -272,11 +278,12 @@ public sealed class ManagementPage : UserControl
         string[] keys = message switch
         {
             var s when s.Contains("Tên sân bay") => ["name"], var s when s.Contains("Thành phố") => ["city"],
+            var s when kind == CatalogKind.Airport && s.Contains("cùng tên và thành phố", StringComparison.OrdinalIgnoreCase) => ["name", "city"],
             var s when s.Contains("tên hạng", StringComparison.OrdinalIgnoreCase) || s.Contains("hạng vé đã tồn tại") => ["name"],
             var s when s.Contains("Giá vé") => ["price"], var s when s.Contains("Hành lý") => ["kg"],
             var s when s.Contains("ghế", StringComparison.OrdinalIgnoreCase) => ["total"], var s when s.Contains("Ngày giờ") => ["ad", "at"],
             var s when s.Contains("sân bay", StringComparison.OrdinalIgnoreCase) => ["from", "to"],
-            var s when s.Contains("Chuyến bay không tồn tại") => ["flight"], _ => []
+            var s when kind == CatalogKind.Fare && s.Contains("chuyến bay", StringComparison.OrdinalIgnoreCase) => ["flight"], _ => []
         };
         foreach (var key in keys) if (fields.TryGetValue(key, out var control)) errors.SetError(control, message);
     }
@@ -447,30 +454,66 @@ public sealed class ManagementPage : UserControl
     private void UpdateChildren()
     {
         children.Items.Clear();
-        if (original is not FlightManagementDTO m) { childTitle.Text = "Hạng vé · Chưa chọn chuyến"; return; }
-        childTitle.Text = $"Hạng vé · Chuyến #{m.Flight.FlightId}";
-        foreach (var fare in fares.Cast<FareClassDTO>().Where(f => f.FlightId == m.Flight.FlightId)) children.Items.Add(new ListViewItem([fare.FareId.ToString(), fare.ClassName, fare.Price.ToString("N2"), fare.BaseBaggageKg.ToString()]));
+        if (original is not FlightManagementDTO selectedFlight)
+        {
+            childTitle.Text = "Hạng vé · Chưa chọn chuyến";
+            return;
+        }
+        int flightId = selectedFlight.Flight.FlightId;
+        childTitle.Text = $"Hạng vé · Chuyến #{flightId}";
+        // ListView con chỉ hiển thị các hạng thuộc chuyến đang chọn ở ListView cha.
+        foreach (FareClassDTO fare in fares)
+        {
+            if (fare.FlightId != flightId) continue;
+            string[] cells = { fare.FareId.ToString(), fare.ClassName, fare.Price.ToString("N2"), fare.BaseBaggageKg.ToString() };
+            children.Items.Add(new ListViewItem(cells));
+        }
         if (children.Items.Count == 0) childTitle.Text += " · chưa có hạng vé";
     }
-    private int Number(string key) => (int)((NumericUpDown)fields[key]).Value;
-    private int SelectedId(string key) => ((ComboBox)fields[key]).SelectedValue is int id ? id : 0;
+    private int Number(string key)
+    {
+        return (int)((NumericUpDown)fields[key]).Value;
+    }
+    private int SelectedId(string key)
+    {
+        if (((ComboBox)fields[key]).SelectedValue is int id) return id;
+        return 0;
+    }
     private Task Save()
     {
         if (editor.Mode == EditorMode.View || busy) return Task.CompletedTask;
         return Run(async () =>
         {
-            errors.Clear(); var previousId = Id(original); int saved;
+            errors.Clear();
+            int previousId = Id(original);
+            int saved;
+            // GUI đọc control và tạo DTO; việc kiểm tra/ghi dữ liệu thuộc BUS và DAO.
             switch (kind)
             {
                 case CatalogKind.Airport:
-                    var a = new AirportDTO(previousId, fields["name"].Text, fields["city"].Text);
-                    saved = await Task.Run(() => bus.SaveAirport(a, original as AirportDTO)); break;
+                    var airport = new AirportDTO(previousId, fields["name"].Text, fields["city"].Text);
+                    if (previousId == 0)
+                        saved = await Task.Run(() => bus.AddAirport(airport));
+                    else
+                        saved = await Task.Run(() => bus.UpdateAirport(airport, original as AirportDTO));
+                    break;
                 case CatalogKind.Flight:
-                    var f = new FlightEdit(previousId, SelectedId("from"), SelectedId("to"), Number("total"), DateOnly.FromDateTime(((DateTimePicker)fields["dd"]).Value), TimeOnly.FromDateTime(((DateTimePicker)fields["dt"]).Value), DateOnly.FromDateTime(((DateTimePicker)fields["ad"]).Value), TimeOnly.FromDateTime(((DateTimePicker)fields["at"]).Value), Choice((ComboBox)fields["status"]));
-                    saved = await Task.Run(() => bus.SaveFlight(f, original as FlightManagementDTO)); break;
+                    DateOnly departureDate = DateOnly.FromDateTime(((DateTimePicker)fields["dd"]).Value);
+                    TimeOnly departureTime = TimeOnly.FromDateTime(((DateTimePicker)fields["dt"]).Value);
+                    DateOnly arrivalDate = DateOnly.FromDateTime(((DateTimePicker)fields["ad"]).Value);
+                    TimeOnly arrivalTime = TimeOnly.FromDateTime(((DateTimePicker)fields["at"]).Value);
+                    var flight = new FlightEdit(previousId, SelectedId("from"), SelectedId("to"), Number("total"),
+                        departureDate, departureTime, arrivalDate, arrivalTime, Choice((ComboBox)fields["status"]));
+                    if (previousId == 0)
+                        saved = await Task.Run(() => bus.AddFlight(flight));
+                    else
+                        saved = await Task.Run(() => bus.UpdateFlight(flight, original as FlightManagementDTO));
+                    break;
                 default:
-                    var fare = new FareClassDTO(previousId, SelectedId("flight"), fields["name"].Text, ((NumericUpDown)fields["price"]).Value, Number("kg"));
-                    saved = await Task.Run(() => bus.SaveFare(fare, original as FareClassDTO)); break;
+                    var fare = new FareClassDTO(previousId, SelectedId("flight"), fields["name"].Text,
+                        ((NumericUpDown)fields["price"]).Value, Number("kg"));
+                    saved = await Task.Run(() => bus.SaveFare(fare, original as FareClassDTO));
+                    break;
             }
             var id = previousId > 0 ? previousId : saved;
             // A committed insert must never be retried if only the subsequent reload fails.
@@ -492,8 +535,26 @@ public sealed class ManagementPage : UserControl
         if (MessageBox.Show(this, $"Xóa #{Id(selected)} — {label}?\nDữ liệu đã được tham chiếu sẽ không được xóa.", "Xác nhận xóa bản ghi", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return Task.CompletedTask;
         return Run(async () =>
         {
-            await Task.Run(() => { switch (selected) { case AirportDTO a: bus.DeleteAirport(a); break; case FlightManagementDTO f: bus.DeleteFlight(f); break; case FareClassDTO f: bus.DeleteFare(f); break; } });
-            ResetView(null); await ReadAll(); if (!IsDisposed) { Render(); Message($"Đã xóa bản ghi #{Id(selected)}."); }
+            // GUI gọi đúng nghiệp vụ theo DTO đang chọn; BUS/DAO quyết định có được xóa hay không.
+            switch (selected)
+            {
+                case AirportDTO airport:
+                    await Task.Run(() => bus.DeleteAirport(airport));
+                    break;
+                case FlightManagementDTO flight:
+                    await Task.Run(() => bus.DeleteFlight(flight));
+                    break;
+                case FareClassDTO fare:
+                    await Task.Run(() => bus.DeleteFare(fare));
+                    break;
+            }
+            ResetView(null);
+            await ReadAll();
+            if (!IsDisposed)
+            {
+                Render();
+                Message($"Đã xóa bản ghi #{Id(selected)}.");
+            }
         }, "Đang xóa bản ghi…");
     }
     private Task PickAirport(string key)
@@ -510,9 +571,20 @@ public sealed class ManagementPage : UserControl
     }
     public async Task ShowFares(int flightId)
     {
-        await EnsureLoaded(); if (IsDisposed || !loaded || !CanLeave()) return;
-        scopeFlight = flightId; binding = true; fareScope.SelectedValue = flightId; binding = false;
-        ResetView(null); Render();
+        // Lần mở tab đầu tiên có thể đã bắt đầu tải từ VisibleChanged.
+        if (loading is { IsCompleted: false }) await loading;
+        if (IsDisposed || !CanLeave()) return;
+        await Run(async () =>
+        {
+            // Tab có thể đã tải trước khi chuyến/hạng được thêm hoặc sửa ở nơi khác.
+            await ReadAll(); if (IsDisposed) return;
+            if (!flights.Cast<FlightManagementDTO>().Any(m => m.Flight.FlightId == flightId))
+                throw new ManagementException("Chuyến bay không còn tồn tại. Hãy tải lại và chọn chuyến khác.");
+            scopeFlight = flightId; binding = true;
+            try { fareScope.SelectedValue = flightId; }
+            finally { binding = false; }
+            ResetView(null); Render();
+        }, "Đang tải hạng vé của chuyến…");
     }
     protected override void Dispose(bool disposing) { if (disposing) errors.Dispose(); base.Dispose(disposing); }
 }
