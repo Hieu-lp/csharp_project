@@ -22,6 +22,7 @@ public sealed class ManagementPage : UserControl
     private readonly Dictionary<string, Control> fields = new();
     private readonly List<Button> pickers = [];
     private readonly ErrorProvider errors = new() { BlinkStyle = ErrorBlinkStyle.NeverBlink };
+    private readonly ToolTip airportTips = new() { ShowAlways = true, AutoPopDelay = 15000 };
     private readonly EditorSession editor = new();
     private readonly Button save, cancel, edit, delete, manage;
     private readonly TableLayoutPanel advanced = Ui.Table(), formFields = Ui.Table();
@@ -228,8 +229,29 @@ public sealed class ManagementPage : UserControl
         var holder = Ui.Table(2); holder.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); holder.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         holder.RowCount = 1; holder.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var combo = Ui.Combo(); fields[key] = combo; combo.AccessibleName = label; holder.Controls.Add(combo, 0, 0);
+        combo.DropDown += (_, _) => FitAirportDropDown(combo);
         var pick = Ui.Button("Chọn…", () => PickAirport(key)); pick.MinimumSize = new Size(60, 32); pickers.Add(pick); holder.Controls.Add(pick, 1, 0);
-        var wrapper = Ui.Table(); Ui.Row(wrapper, Ui.Label(label)); Ui.Row(wrapper, holder); Ui.Row(formFields, wrapper);
+        var title = Ui.Label(label);
+        combo.SelectedIndexChanged += (_, _) =>
+        {
+            string text = combo.SelectedItem is null ? "" : (combo.GetItemText(combo.SelectedItem) ?? "");
+            airportTips.SetToolTip(combo, text);
+            airportTips.SetToolTip(title, text); // Nhãn vẫn bật khi ComboBox ở chế độ xem bị khóa.
+            title.AccessibleDescription = text;
+        };
+        var wrapper = Ui.Table(); Ui.Row(wrapper, title); Ui.Row(wrapper, holder); Ui.Row(formFields, wrapper);
+    }
+    private static void FitAirportDropDown(ComboBox combo)
+    {
+        int width = combo.Width;
+        int padding = SystemInformation.VerticalScrollBarWidth + 16 * combo.DeviceDpi / 96;
+        foreach (object item in combo.Items)
+        {
+            int textWidth = TextRenderer.MeasureText(combo.GetItemText(item), combo.Font).Width;
+            width = Math.Max(width, textWidth + padding);
+        }
+        int screenWidth = Math.Max(combo.Width, Screen.FromControl(combo).WorkingArea.Width - 24);
+        combo.DropDownWidth = Math.Min(width, screenWidth);
     }
     private void SearchKey(object? sender, KeyEventArgs e)
     { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; ApplyFilter(); } }
@@ -586,5 +608,9 @@ public sealed class ManagementPage : UserControl
             ResetView(null); Render();
         }, "Đang tải hạng vé của chuyến…");
     }
-    protected override void Dispose(bool disposing) { if (disposing) errors.Dispose(); base.Dispose(disposing); }
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) { errors.Dispose(); airportTips.Dispose(); }
+        base.Dispose(disposing);
+    }
 }

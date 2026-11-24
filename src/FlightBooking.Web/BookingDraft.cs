@@ -11,8 +11,16 @@ public sealed class BookingDraft
     public BookingRequest Request { get; set; } = new();
     public int? CompletedBookingId { get; set; }
     public string? AppliedDiscountState { get; set; }
-    public static BookingDraft? Load(ISession session, string? id) =>
-        id is { Length: 32 } && session.GetString("checkout:" + id) is string json
-            ? JsonSerializer.Deserialize<BookingDraft>(json) : null;
-    public void Save(ISession session) => session.SetString("checkout:" + Id, JsonSerializer.Serialize(this));
+    public static BookingDraft? Load(ISession session, string? id)
+    {
+        if (id is not { Length: 32 }) return null;
+        string? json = session.GetString("checkout:" + id);
+        if (json is null) return null;
+        return JsonSerializer.Deserialize<BookingDraft>(json);
+    }
+
+    public void Save(ISession session)
+    {
+        session.SetString("checkout:" + Id, JsonSerializer.Serialize(this));
+    }
 }

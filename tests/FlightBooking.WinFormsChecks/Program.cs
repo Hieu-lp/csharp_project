@@ -20,7 +20,8 @@ internal static class Program
     private static void Main(string[] args)
     {
         var connection = Environment.GetEnvironmentVariable("FLIGHTBOOKING_UI_READ_CONNECTION");
-        if (string.IsNullOrWhiteSpace(connection))
+        bool dropdownOnly = args.Contains("--dropdown-only");
+        if (!dropdownOnly && string.IsNullOrWhiteSpace(connection))
             throw new InvalidOperationException("Set FLIGHTBOOKING_UI_READ_CONNECTION; checks only read existing data.");
         ApplicationConfiguration.Initialize();
         System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("vi-VN");
@@ -29,9 +30,13 @@ internal static class Program
         {
             try
             {
-                await Run(host, new ManagementBUS(connection));
-                if (args.Contains("--interaction")) await InteractionChecks.Run(host, connection, Check);
-                if (args.Contains("--layout")) await LayoutChecks.Run(host, new ManagementBUS(connection), Check);
+                if (!dropdownOnly)
+                {
+                    await Run(host, new ManagementBUS(connection!));
+                    if (args.Contains("--interaction")) await InteractionChecks.Run(host, connection!, Check);
+                    if (args.Contains("--layout")) await LayoutChecks.Run(host, new ManagementBUS(connection!), Check);
+                }
+                await AirportDropDownChecks.Run(host, Check);
             }
             catch (Exception error) { Console.Error.WriteLine(error); Environment.ExitCode = 1; }
             finally { host.Close(); }

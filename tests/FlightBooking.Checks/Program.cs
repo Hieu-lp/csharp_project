@@ -137,6 +137,8 @@ BookingBUS.Validate(trimmedPaper, DateOnly.FromDateTime(now));
 Check(trimmedPaper.Customer.IdPassportNumber == "TEST-BOOKER-001", "contact paper trims without borrowing passenger identity");
 Check(BookingBUS.NormalizeCode("  welcome10 ") == BookingBUS.NormalizeCode("WELCOME10"), "discount identity ignores whitespace and case");
 Check(new BookingBUS("", new ContactTestClock(new DateTimeOffset(2026,11,20,17,5,0,TimeSpan.Zero))).Today == new DateOnly(2026,11,21), "contact age uses Vietnam date across UTC midnight boundary");
+BookingStyleChecks.Run(Check, Valid, DateOnly.FromDateTime(now));
+BookingDataAccessChecks.Run(Check, Valid);
 if (args.Contains("--browse")) BrowseChecks.Run(Check);
 if (args.Contains("--demo-rollback")) DemoRollbackChecks.Run(Check);
 if (args.Contains("--sql")) await SqlChecks.Run(Check);

@@ -1,5 +1,10 @@
 # FlightBookingSystem — Báo cáo tiến độ phần Thịnh
 
+**Tiếp nối 24/11/2026:** xem [chuẩn hóa Booking, code trước–sau, kết quả mới và
+giới hạn nghiệm thu Hiếu–Thịnh](Docs/ChuanHoa-Booking-Hieu-Thinh-2026-11-24.md).
+Các số liệu/giả định bên dưới thuộc báo cáo tiến độ cũ; trạng thái mới dùng bản
+bàn giao vừa liên kết.
+
 **Chạy thử web và app:** [Hướng dẫn từng bước, dữ liệu mẫu và checklist kiểm tra](Docs/HuongDan-Chay-Va-Test.md).
 
 **Đề tài:** Quản lý bán vé máy bay

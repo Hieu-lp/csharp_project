@@ -6,8 +6,15 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FlightBooking.Web.Pages.Booking;
 
-public class LookupModel(BookingBUS bus) : PageModel
+public class LookupModel : PageModel
 {
+    private readonly BookingBUS bus;
+
+    public LookupModel(BookingBUS bus)
+    {
+        this.bus = bus;
+    }
+
     [BindProperty, Range(1, int.MaxValue, ErrorMessage = "Mã đơn phải là số nguyên dương.")] public int BookingId { get; set; }
     [BindProperty, Required(ErrorMessage = "Nhập khóa tra cứu."), StringLength(64, MinimumLength = 64, ErrorMessage = "Khóa tra cứu cần đủ 64 ký tự.")] public string AccessKey { get; set; } = "";
     public string? Error { get; private set; }

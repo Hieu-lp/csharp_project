@@ -5,8 +5,15 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FlightBooking.Web.Pages.Booking;
 
-public class DetailsModel(BookingBUS bus) : PageModel
+public class DetailsModel : PageModel
 {
+    private readonly BookingBUS bus;
+
+    public DetailsModel(BookingBUS bus)
+    {
+        this.bus = bus;
+    }
+
     public IReadOnlyList<BookingDTO> Bookings { get; private set; } = [];
     public string? AccessKey { get; private set; }
     public string? Error { get; private set; }
@@ -36,7 +43,11 @@ public class DetailsModel(BookingBUS bus) : PageModel
             return RedirectToPage(new { id });
         }
         catch (BookingException e) { Error = e.Message; }
-        try { Bookings = bus.GetJourney(id, AccessKey); } catch (BookingException) { }
+        try { Bookings = bus.GetJourney(id, AccessKey); }
+        catch (BookingException)
+        {
+            // Lần đọc lại chỉ bổ sung màn hình; thông báo lỗi hủy gốc ở trên vẫn được hiển thị.
+        }
         return Page();
     }
 }

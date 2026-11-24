@@ -32,5 +32,6 @@ internal static class BrowseChecks
             catch (FlightBooking.DTO.BookingException) { check(true, "SQL: reject fare belonging to another flight"); }
         }
         check(bus.GetFareClassNames().Count > 0, "SQL: fare dropdown reads database");
+        IntegrationReadChecks.Run(check, cs);
     }
 }

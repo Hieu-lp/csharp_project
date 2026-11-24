@@ -5,8 +5,15 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FlightBooking.Web.Pages.Booking;
 
-public class CheckoutModel(BookingBUS bus) : PageModel
+public class CheckoutModel : PageModel
 {
+    private readonly BookingBUS bus;
+
+    public CheckoutModel(BookingBUS bus)
+    {
+        this.bus = bus;
+    }
+
     [BindProperty] public BookingRequest Input { get; set; } = new();
     [BindProperty] public string DraftId { get; set; } = "";
     public JourneyQuoteDTO? Quote { get; private set; }
@@ -40,13 +47,17 @@ public class CheckoutModel(BookingBUS bus) : PageModel
         return Page();
     }
 
-    private static string Selection(BookingRequest input) =>
-        $"{input.FlightId}:{input.FareId}:{input.Quantity}:{input.TripType}:{input.ReturnDate}:{input.ReturnFlightId}:{input.ReturnFareId}";
+    private static string Selection(BookingRequest input)
+    {
+        return $"{input.FlightId}:{input.FareId}:{input.Quantity}:{input.TripType}:{input.ReturnDate}:{input.ReturnFlightId}:{input.ReturnFareId}";
+    }
 
-    private static string DiscountState(BookingRequest input, JourneyQuoteDTO quote) =>
-        System.Text.Json.JsonSerializer.Serialize(new { Journey = Selection(input), Code = BookingBUS.NormalizeCode(input.DiscountCode),
+    private static string DiscountState(BookingRequest input, JourneyQuoteDTO quote)
+    {
+        return System.Text.Json.JsonSerializer.Serialize(new { Journey = Selection(input), Code = BookingBUS.NormalizeCode(input.DiscountCode),
             quote.Outbound.Subtotal, quote.Outbound.DiscountId, quote.Outbound.DiscountAmount,
             ReturnSubtotal = quote.Return?.Subtotal, quote.TotalAmount });
+    }
 
     public IActionResult OnPost(string action)
     {
@@ -62,17 +73,8 @@ public class CheckoutModel(BookingBUS bus) : PageModel
             draft.Save(HttpContext.Session);
             if (action == "back")
             {
-                // Save even incomplete fields before returning to flight selection.
-                var flight = bus.GetFlight(Input.FlightId);
-                return RedirectToPage("/Index", new Microsoft.AspNetCore.Routing.RouteValueDictionary
-                {
-                    ["Submitted"] = "true", ["DraftId"] = DraftId,
-                    ["Search.DepartureAirportId"] = flight.DepartureAirportId.ToString(),
-                    ["Search.ArrivalAirportId"] = flight.ArrivalAirportId.ToString(),
-                    ["Search.DepartureDate"] = flight.DepartureDate.ToString("yyyy-MM-dd"),
-                    ["Search.Passengers"] = Input.Quantity.ToString(), ["Search.TripType"] = Input.TripType,
-                    ["Search.ReturnDate"] = Input.ReturnDate?.ToString("yyyy-MM-dd")
-                });
+                // Bản nháp đã lưu ở trên, kể cả khi thông tin người đặt chưa nhập đủ.
+                return BackToSearch();
             }
             if (BookingBUS.ContactBirthDateError(Input.Customer?.DateOfBirth, Today) is { } birthError)
             {
@@ -86,26 +88,53 @@ public class CheckoutModel(BookingBUS bus) : PageModel
             draft.Save(HttpContext.Session);
             if (action == "quote")
             {
-                Quote = bus.QuoteJourney(Input);
-                Input.ExpectedTotal = Quote.TotalAmount;
-                ModelState.Remove("Input.ExpectedTotal");
-                if (Quote.Outbound.DiscountId is not null)
-                {
-                    var state = DiscountState(Input, Quote);
-                    DiscountMessage = appliedState == state ? "Mã giảm giá này đã được áp dụng" : "Đã áp dụng mã giảm giá.";
-                    draft.AppliedDiscountState = state;
-                }
-                else DiscountMessage = "Đã cập nhật giá, không áp dụng mã giảm giá.";
-                draft.Save(HttpContext.Session);
-                return Page();
+                return PreviewQuote(draft, appliedState);
             }
+            // Chỉ xác nhận khi model hợp lệ. Giá/ghế/transaction vẫn do BUS và DAO xử lý.
             if (!ModelState.IsValid) { LoadQuote(); return Page(); }
-            var bookingId = bus.Create(Input, draft.AccessKey);
-            HttpContext.Session.SetString("booking:" + bookingId, draft.AccessKey);
-            draft.CompletedBookingId = bookingId; draft.Save(HttpContext.Session);
-            return RedirectToPage("Details", new { id = bookingId });
+            return ConfirmBooking(draft);
         }
         catch (BookingException e) { Error = e.Message; LoadQuote(); draft?.Save(HttpContext.Session); return Page(); }
+    }
+
+    private IActionResult BackToSearch()
+    {
+        FlightDTO flight = bus.GetFlight(Input.FlightId);
+        return RedirectToPage("/Index", new Microsoft.AspNetCore.Routing.RouteValueDictionary
+        {
+            ["Submitted"] = "true", ["DraftId"] = DraftId,
+            ["Search.DepartureAirportId"] = flight.DepartureAirportId.ToString(),
+            ["Search.ArrivalAirportId"] = flight.ArrivalAirportId.ToString(),
+            ["Search.DepartureDate"] = flight.DepartureDate.ToString("yyyy-MM-dd"),
+            ["Search.Passengers"] = Input.Quantity.ToString(), ["Search.TripType"] = Input.TripType,
+            ["Search.ReturnDate"] = Input.ReturnDate?.ToString("yyyy-MM-dd")
+        });
+    }
+
+    private IActionResult PreviewQuote(BookingDraft draft, string? appliedState)
+    {
+        // Nhận giá từ BUS; PageModel không tự tính giá hoặc cập nhật số ghế.
+        Quote = bus.QuoteJourney(Input);
+        Input.ExpectedTotal = Quote.TotalAmount;
+        ModelState.Remove("Input.ExpectedTotal");
+        if (Quote.Outbound.DiscountId is not null)
+        {
+            string state = DiscountState(Input, Quote);
+            DiscountMessage = appliedState == state ? "Mã giảm giá này đã được áp dụng" : "Đã áp dụng mã giảm giá.";
+            draft.AppliedDiscountState = state;
+        }
+        else DiscountMessage = "Đã cập nhật giá, không áp dụng mã giảm giá.";
+        draft.Save(HttpContext.Session);
+        return Page();
+    }
+
+    private IActionResult ConfirmBooking(BookingDraft draft)
+    {
+        int bookingId = bus.Create(Input, draft.AccessKey);
+        HttpContext.Session.SetString("booking:" + bookingId, draft.AccessKey);
+        draft.CompletedBookingId = bookingId;
+        draft.Save(HttpContext.Session);
+        return RedirectToPage("Details", new { id = bookingId });
     }
 
     private void LoadQuote()
@@ -116,7 +145,10 @@ public class CheckoutModel(BookingBUS bus) : PageModel
         {
             var code = Input.DiscountCode;
             try { Input.DiscountCode = null; Quote = bus.QuoteJourney(Input); }
-            catch (BookingException) { }
+            catch (BookingException)
+            {
+                // Quote dự phòng không bắt buộc: giữ lỗi gốc/ModelState để khách sửa biểu mẫu.
+            }
             finally { Input.DiscountCode = code; }
         }
     }

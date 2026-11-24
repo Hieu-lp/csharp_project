@@ -74,7 +74,16 @@ public sealed record BookingDTO(int BookingId, int CustomerId, int FlightId, int
     DateTime BookingDate, string BookingSource, int TicketQuantity, decimal DiscountAmount,
     decimal TotalAmount, string Status, string CustomerName, string Email, string Phone,
     string InvoiceStatus, FlightDTO Flight, IReadOnlyList<BookingDetailDTO> Details);
-public sealed class BookingException(string message) : Exception(message);
+public sealed class BookingException : Exception
+{
+    public BookingException(string message) : base(message)
+    {
+    }
+
+    public BookingException(string message, Exception innerException) : base(message, innerException)
+    {
+    }
+}
 
 public sealed class FlightSearch
 {

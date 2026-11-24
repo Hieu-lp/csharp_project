@@ -4,43 +4,124 @@ using Microsoft.Data.SqlClient;
 
 namespace FlightBooking.DAO;
 
-public sealed class BookingDAO(MyConnection connection)
+public sealed class BookingDAO
 {
+    private readonly MyConnection connection;
+    private const string ConnectionFailureMessage = "Chưa kết nối được database. Kiểm tra cấu hình FlightBookingDB.";
+
+    public BookingDAO(string connectionString)
+    {
+        connection = new MyConnection(connectionString);
+    }
+
+    public BookingDAO(MyConnection connection)
+    {
+        this.connection = connection;
+    }
+
+    private static BookingException DatabaseError(SqlException error)
+    {
+        if (error.Number == 208)
+            return new BookingException("Database chưa đủ bảng. Cần người phụ trách Database kiểm tra script 01–03 và duyệt script 08.", error);
+        if (error.Number == 1205 || error.Number == 2601 || error.Number == 2627)
+            return new BookingException("Dữ liệu vừa thay đổi hoặc yêu cầu đang xử lý. Vui lòng gửi lại cùng biểu mẫu.", error);
+        return new BookingException("Không thể xử lý với SQL Server. Vui lòng thử lại hoặc liên hệ nhóm quản lý.", error);
+    }
+
+    private SqlConnection OpenConnection()
+    {
+        try { return connection.Open(); }
+        catch (ArgumentException error)
+        {
+            throw new BookingException(ConnectionFailureMessage, error);
+        }
+    }
+
     public T Read<T>(Func<BookingData, T> action)
     {
-        using var sql = connection.Open();
-        return action(new BookingData(sql, null));
+        try
+        {
+            using var sql = OpenConnection();
+            return action(new BookingData(sql, null));
+        }
+        catch (SqlException error) { throw DatabaseError(error); }
+        catch (InvalidOperationException error) { throw new BookingException(ConnectionFailureMessage, error); }
     }
 
     public T Write<T>(Func<BookingData, T> action)
     {
-        using var sql = connection.Open();
-        using var transaction = sql.BeginTransaction(IsolationLevel.Serializable);
+        // API cũ vẫn dùng cùng ranh giới giao dịch.
+        return InTransaction(action);
+    }
+
+    public void InTransaction(Action<BookingData> action)
+    {
+        InTransaction<int>(data => { action(data); return 0; });
+    }
+
+    public T InTransaction<T>(Func<BookingData, T> action)
+    {
         try
         {
+            using var sql = OpenConnection();
+            using var transaction = sql.BeginTransaction(IsolationLevel.Serializable);
             var result = action(new BookingData(sql, transaction));
             transaction.Commit();
             return result;
         }
-        catch
-        {
-            // Disposing an uncommitted transaction rolls back every write.
-            throw;
-        }
+        // Nếu action/commit lỗi, using giải phóng transaction chưa commit để rollback.
+        catch (SqlException error) { throw DatabaseError(error); }
+        catch (InvalidOperationException error) { throw new BookingException(ConnectionFailureMessage, error); }
+    }
+
+    public FlightDTO GetFlight(int id)
+    {
+        return Read(data => data.Flight(id));
+    }
+
+    public List<AirportDTO> GetAirports()
+    {
+        return Read(data => data.Airports());
+    }
+
+    public List<string> GetFareClassNames()
+    {
+        return Read(data => data.FareClassNames());
+    }
+
+    public BookingDTO? GetBooking(int id, string hash)
+    {
+        return Read(data => data.Booking(id, hash));
     }
 }
 
-// One short-lived data access context, owned by BookingDAO.Read/Write.
-public sealed class BookingData(SqlConnection connection, SqlTransaction? transaction)
+// Context dùng chung kết nối/transaction, chỉ tồn tại trong lần gọi Read/InTransaction.
+public sealed class BookingData
 {
+    private readonly SqlConnection connection;
+    private readonly SqlTransaction? transaction;
+
+    public BookingData(SqlConnection connection, SqlTransaction? transaction)
+    {
+        this.connection = connection;
+        this.transaction = transaction;
+    }
     private SqlCommand Command(string sql, params (string Name, object? Value)[] args)
     {
         var command = new SqlCommand(sql, connection, transaction);
         foreach (var (name, value) in args)
         {
             var p = command.Parameters.AddWithValue(name, value ?? DBNull.Value);
-            if (value is decimal) { p.Precision = 18; p.Scale = 2; }
-            if (value is DateOnly date) { p.SqlDbType = SqlDbType.Date; p.Value = date.ToDateTime(TimeOnly.MinValue); }
+            if (value is decimal)
+            {
+                p.Precision = 18;
+                p.Scale = 2;
+            }
+            if (value is DateOnly date)
+            {
+                p.SqlDbType = SqlDbType.Date;
+                p.Value = date.ToDateTime(TimeOnly.MinValue);
+            }
         }
         return command;
     }
@@ -73,19 +154,27 @@ public sealed class BookingData(SqlConnection connection, SqlTransaction? transa
     {
         using var command = Command("SELECT booking_id,payload_hash FROM dbo.BOOKING_WEB_REQUEST WITH (UPDLOCK,HOLDLOCK) WHERE request_hash=@hash", ("@hash", hash));
         using var reader = command.ExecuteReader();
-        return reader.Read() ? (reader.GetInt32(0), reader.GetString(1)) : null;
+        if (!reader.Read()) return null;
+        return (reader.GetInt32(0), reader.GetString(1));
     }
 
-    public void SaveRequest(string hash, string payloadHash, int bookingId) => Execute("""
+    public void SaveRequest(string hash, string payloadHash, int bookingId)
+    {
+        Execute("""
         INSERT dbo.BOOKING_WEB_REQUEST(request_hash,payload_hash,booking_id) VALUES (@hash,@payload,@booking)
         """, ("@hash", hash), ("@payload", payloadHash), ("@booking", bookingId));
+    }
 
     public List<AirportDTO> Airports()
     {
         using var command = Command("SELECT airport_id,airport_name,city FROM dbo.AIRPORT ORDER BY city,airport_id");
         using var reader = command.ExecuteReader();
         var result = new List<AirportDTO>();
-        while (reader.Read()) result.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
+        while (reader.Read())
+        {
+            var airport = new AirportDTO(reader.GetInt32(0), reader.GetString(1), reader.GetString(2));
+            result.Add(airport);
+        }
         return result;
     }
 
@@ -100,11 +189,14 @@ public sealed class BookingData(SqlConnection connection, SqlTransaction? transa
         JOIN dbo.AIRPORT a ON a.airport_id=f.departure_airport_id
         JOIN dbo.AIRPORT z ON z.airport_id=f.arrival_airport_id
         """;
-    private static FlightDTO MapFlight(SqlDataReader r) => new(r.GetInt32(0), r.GetInt32(1), r.GetInt32(2),
-        r.GetString(3), r.GetString(4), r.GetString(5), r.GetString(6),
-        DateOnly.FromDateTime(r.GetDateTime(7)), TimeOnly.FromTimeSpan(r.GetTimeSpan(8)),
-        DateOnly.FromDateTime(r.GetDateTime(9)), TimeOnly.FromTimeSpan(r.GetTimeSpan(10)),
-        r.GetInt32(11), r.GetInt32(12), r.GetString(13));
+    private static FlightDTO MapFlight(SqlDataReader r)
+    {
+        return new FlightDTO(r.GetInt32(0), r.GetInt32(1), r.GetInt32(2),
+            r.GetString(3), r.GetString(4), r.GetString(5), r.GetString(6),
+            DateOnly.FromDateTime(r.GetDateTime(7)), TimeOnly.FromTimeSpan(r.GetTimeSpan(8)),
+            DateOnly.FromDateTime(r.GetDateTime(9)), TimeOnly.FromTimeSpan(r.GetTimeSpan(10)),
+            r.GetInt32(11), r.GetInt32(12), r.GetString(13));
+    }
 
     public List<FlightDTO> Flights(FlightSearch search)
     {
@@ -146,7 +238,12 @@ public sealed class BookingData(SqlConnection connection, SqlTransaction? transa
             """, ("@date", DateOnly.FromDateTime(now)), ("@time", now.TimeOfDay));
         using var r = command.ExecuteReader();
         var offers = new List<FlightOfferDTO>();
-        while (r.Read()) offers.Add(new(MapFlight(r), new(r.GetInt32(14), r.GetInt32(0), r.GetString(15), r.GetDecimal(16), r.GetInt32(17))));
+        while (r.Read())
+        {
+            FlightDTO flight = MapFlight(r);
+            var fare = new FareClassDTO(r.GetInt32(14), r.GetInt32(0), r.GetString(15), r.GetDecimal(16), r.GetInt32(17));
+            offers.Add(new FlightOfferDTO(flight, fare));
+        }
         return offers;
     }
 
@@ -155,7 +252,8 @@ public sealed class BookingData(SqlConnection connection, SqlTransaction? transa
         using var command = Command(FlightColumns + (locked ? " WITH (UPDLOCK,HOLDLOCK) " : " ") + AirportJoins +
             " WHERE f.flight_id=@id", ("@id", id));
         using var reader = command.ExecuteReader();
-        return reader.Read() ? MapFlight(reader) : throw new BookingException("Không tìm thấy chuyến bay.");
+        if (!reader.Read()) throw new BookingException("Không tìm thấy chuyến bay.");
+        return MapFlight(reader);
     }
 
     public List<FareClassDTO> Fares(int flightId, bool locked = false)
@@ -164,7 +262,11 @@ public sealed class BookingData(SqlConnection connection, SqlTransaction? transa
             (locked ? "WITH (UPDLOCK,HOLDLOCK) " : "") + "WHERE flight_id=@id ORDER BY price,fare_id", ("@id", flightId));
         using var reader = command.ExecuteReader();
         var result = new List<FareClassDTO>();
-        while (reader.Read()) result.Add(new(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetDecimal(3), reader.GetInt32(4)));
+        while (reader.Read())
+        {
+            var fare = new FareClassDTO(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetDecimal(3), reader.GetInt32(4));
+            result.Add(fare);
+        }
         return result;
     }
 
@@ -175,9 +277,10 @@ public sealed class BookingData(SqlConnection connection, SqlTransaction? transa
                 start_date,end_date,usage_limit,used_count,status FROM dbo.DISCOUNT_CODE
             """ + (locked ? " WITH (UPDLOCK,HOLDLOCK) " : " ") + "WHERE code=@code", ("@code", code));
         using var r = command.ExecuteReader();
-        return r.Read() ? new(r.GetInt32(0), r.GetString(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4),
+        if (!r.Read()) return null;
+        return new DiscountCodeDTO(r.GetInt32(0), r.GetString(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4),
             r.IsDBNull(5) ? null : r.GetDecimal(5), r.GetDateTime(6), r.GetDateTime(7),
-            r.IsDBNull(8) ? null : r.GetInt32(8), r.GetInt32(9), r.GetString(10)) : null;
+            r.IsDBNull(8) ? null : r.GetInt32(8), r.GetInt32(9), r.GetString(10));
     }
 
     public HashSet<string> ActiveSeats(int flightId)
@@ -189,24 +292,33 @@ public sealed class BookingData(SqlConnection connection, SqlTransaction? transa
         return seats;
     }
 
-    public int InsertCustomer(CustomerInput input) => Identity("""
+    public int InsertCustomer(CustomerInput input)
+    {
+        return Identity("""
         INSERT dbo.CUSTOMER(full_name,phone,email,date_of_birth,gender,id_passport_number)
         OUTPUT INSERTED.customer_id VALUES (@name,@phone,@email,@dob,@gender,@passport)
         """, ("@name", input.FullName), ("@phone", input.Phone), ("@email", input.Email),
         ("@dob", input.DateOfBirth), ("@gender", input.Gender), ("@passport", input.IdPassportNumber));
+    }
 
-    public int InsertBooking(int customerId, BookingQuoteDTO quote, DateTime now) => Identity("""
+    public int InsertBooking(int customerId, BookingQuoteDTO quote, DateTime now)
+    {
+        return Identity("""
         INSERT dbo.BOOKING(customer_id,employee_id,flight_id,discount_id,booking_date,booking_source,
             ticket_quantity,discount_amount,total_amount,status)
         OUTPUT INSERTED.booking_id VALUES (@customer,NULL,@flight,@discount,@now,'WEB',@qty,@amount,@total,'CONFIRMED')
         """, ("@customer", customerId), ("@flight", quote.Flight.FlightId), ("@discount", quote.DiscountId),
         ("@now", now), ("@qty", quote.Quantity), ("@amount", quote.DiscountAmount), ("@total", quote.TotalAmount));
+    }
 
-    public int InsertInvoice(int bookingId, BookingQuoteDTO quote, DateTime now) => Identity("""
+    public int InsertInvoice(int bookingId, BookingQuoteDTO quote, DateTime now)
+    {
+        return Identity("""
         INSERT dbo.INVOICE(booking_id,invoice_date,total,discount_amount,tax_amount,total_amount,status)
         OUTPUT INSERTED.invoice_id VALUES (@booking,@now,@subtotal,@discount,0,@total,'UNPAID')
         """, ("@booking", bookingId), ("@now", now), ("@subtotal", quote.Subtotal),
         ("@discount", quote.DiscountAmount), ("@total", quote.TotalAmount));
+    }
 
     public void InsertPassenger(int bookingId, int invoiceId, BookingQuoteDTO quote, PassengerInput passenger, string seat, DateTime now)
     {
@@ -259,11 +371,21 @@ public sealed class BookingData(SqlConnection connection, SqlTransaction? transa
         using (var r = command.ExecuteReader())
         {
             if (!r.Read()) return null;
-            customer=r.GetInt32(0); flight=r.GetInt32(1); discount=r.IsDBNull(2)?null:r.GetInt32(2);
-            date=r.GetDateTime(3); source=r.GetString(4); quantity=r.GetInt32(5);
-            discountAmount=r.GetDecimal(6); total=r.GetDecimal(7); status=r.GetString(8);
-            name=r.GetString(9); email=r.GetString(10); phone=r.GetString(11); invoiceStatus=r.GetString(12);
+            customer = r.GetInt32(0);
+            flight = r.GetInt32(1);
+            discount = r.IsDBNull(2) ? null : r.GetInt32(2);
+            date = r.GetDateTime(3);
+            source = r.GetString(4);
+            quantity = r.GetInt32(5);
+            discountAmount = r.GetDecimal(6);
+            total = r.GetDecimal(7);
+            status = r.GetString(8);
+            name = r.GetString(9);
+            email = r.GetString(10);
+            phone = r.GetString(11);
+            invoiceStatus = r.GetString(12);
         }
+        // Reader đã đóng trước khi đọc thêm chuyến và chi tiết trên cùng kết nối.
         return new(id, customer, flight, discount, date, source, quantity, discountAmount, total, status,
             name, email, phone, invoiceStatus, Flight(flight), Details(id));
     }
@@ -279,8 +401,12 @@ public sealed class BookingData(SqlConnection connection, SqlTransaction? transa
             """, ("@id", bookingId));
         using var r = command.ExecuteReader();
         var result = new List<BookingDetailDTO>();
-        while (r.Read()) result.Add(new(r.GetInt32(0), r.GetInt32(1), r.GetString(2), r.GetString(3),
-            r.GetDecimal(4), r.GetString(5), r.GetString(6), r.GetString(7)));
+        while (r.Read())
+        {
+            var detail = new BookingDetailDTO(r.GetInt32(0), r.GetInt32(1), r.GetString(2), r.GetString(3),
+                r.GetDecimal(4), r.GetString(5), r.GetString(6), r.GetString(7));
+            result.Add(detail);
+        }
         return result;
     }
 
