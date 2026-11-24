@@ -13,6 +13,6 @@ static class Program
         ApplicationConfiguration.Initialize();
         System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("vi-VN");
         System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("vi-VN");
-        Application.Run(new Form1());
+        Application.Run(new MainForm());
     }
 }

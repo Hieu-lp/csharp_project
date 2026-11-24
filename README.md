@@ -5,6 +5,8 @@ Kiến trúc **GUI → BUS → DAO**, DTO truyền dữ liệu giữa các lớp
 SqlClient và truy vấn tham số hóa. Identifier nghiệp vụ dùng tiếng Việt không dấu.
 
 Hiếu quản lý sân bay, chuyến bay, hạng vé và tìm kiếm ArrayList AND/OR/NOT.
+MainForm và các màn hình khách hàng/nhân viên/mã giảm giá đã có trên develop;
+menu quản lý chuyến bay mở Form1 với ba tab Việt hóa của Hiếu.
 Thịnh triển khai tìm/chọn chuyến, báo giá server, đặt vé một chiều/khứ hồi,
 tra cứu và hủy. Đặt/hủy chạy trong transaction, bảo vệ ghế, giá lịch sử và
 yêu cầu gửi lặp; hóa đơn mới UNPAID, chưa ghi doanh thu đã thu.
@@ -67,6 +69,8 @@ Mở http://127.0.0.1:5087/. WinForms ưu tiên biến môi trường; có thể
 `connection.local.txt` cạnh executable làm fallback (file bị Git ignore).
 Web đọc key `ConnectionStrings:FlightBookingDB`. Ví dụ trên dành cho phát triển
 với chứng chỉ tự ký; môi trường triển khai cần chứng chỉ được tin cậy.
+Các DAO quản lý từ develop cũng nhận biến này; `FLIGHTBOOKING_DB_CONNECTION`
+được giữ làm fallback tương thích. WinForms khởi động qua MainForm hiện có.
 
 Thử: tạo chuyến/hạng → Web tìm/chọn → nhập người đặt và từng hành khách →
 tính lại giá → xác nhận → lưu mã/khóa riêng → tra cứu/hủy → WinForms **Tải lại**.
@@ -118,10 +122,10 @@ hoặc DPI Windows 125%/150%; không tự đổi thiết lập màn hình để 
 | [FlightBooking.Web](src/FlightBooking.Web/) | Razor Pages tìm/đặt/tra cứu/hủy, session và antiforgery. |
 | [Database](Database/) | 8 script chính thức của nhóm và TestPlan có guard. |
 | [tests](tests/) | C#, WinForms, HTTP, JavaScript và preflight/policy dùng chung. |
-| [Docs](Docs/) | [ERD chung](Docs/flight_booking_erd_source.drawio) và tài liệu nghiệp vụ của Thịnh được giữ theo quyền sở hữu. |
+| [Docs](Docs/) | [ERD chung](Docs/flight_booking_erd_source.drawio) và tài liệu nghiệp vụ của các thành viên được giữ theo quyền sở hữu. |
 
 MyConnection/Open, namespace và tên project giữ nguyên. Public API nghiệp vụ
 đã đổi tên Việt; khi tích hợp nhánh thành viên cần cập nhật type/member tương ứng,
-giữ hợp đồng HTTP/JSON và schema. Chưa tích hợp MainForm/khách–nhân viên của Phú
-hoặc thanh toán/thống kê/xls/PDF của Quân. Bảng tham số, báo cáo cuối kỳ W7 và
+giữ hợp đồng HTTP/JSON và schema. Các module quản lý đã có trên develop được bảo toàn;
+chưa bổ sung thanh toán/thống kê/xls/PDF của Quân. Bảng tham số, báo cáo cuối kỳ W7 và
 các kiểm thử thủ công còn thiếu vẫn cần nhóm hoàn tất.

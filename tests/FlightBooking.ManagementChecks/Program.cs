@@ -1,6 +1,7 @@
 using System.Collections;
 using FlightBooking.BUS;
 using FlightBooking.DTO;
+using FlightBooking.ManagementChecks;
 
 int checks=0;
 void Check(bool yes,string label){if(!yes)throw new Exception("FAIL: "+label);checks++;Console.WriteLine("PASS: "+label);}
@@ -79,4 +80,8 @@ ExceptionChecks.Run(Check);
 CrudChecks.Run(Check);
 FlightBooking.Testing.SqlTestPolicyChecks.Run(Check);
 if(args.Contains("--sql"))SqlManagementChecks.Run(Check,Reject);
+CustomerChecks.Run();
+EmployeeChecks.Run();
+DiscountCodeChecks.Run();
+ArrayListSearchChecks.Run();
 Console.WriteLine($"{checks} checks passed.");

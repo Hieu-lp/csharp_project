@@ -12,6 +12,8 @@ public partial class Form1 : Form
         Bounds = GiaoDien.KichThuocCuaSo(vungLamViec, new Size(1340, 840));
         MinimumSize = new Size(Math.Min(1040, vungLamViec.Width - 24), Math.Min(640, vungLamViec.Height - 24));
         var ketNoi = Environment.GetEnvironmentVariable("ConnectionStrings__FlightBookingDB");
+        if (string.IsNullOrWhiteSpace(ketNoi))
+            ketNoi = Environment.GetEnvironmentVariable("FLIGHTBOOKING_DB_CONNECTION");
         var duongDan = Path.Combine(AppContext.BaseDirectory, "connection.local.txt");
         if (string.IsNullOrWhiteSpace(ketNoi) && File.Exists(duongDan)) ketNoi = File.ReadAllText(duongDan).Trim();
         var nghiepVu = new FlightBooking.BUS.QuanLyBUS(ketNoi ?? "");
