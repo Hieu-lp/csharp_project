@@ -11,8 +11,8 @@ internal static class DemoRollbackChecks
     {
         var cs = Environment.GetEnvironmentVariable("FLIGHTBOOKING_DEMO_CONNECTION")
             ?? throw new InvalidOperationException("Set FLIGHTBOOKING_DEMO_CONNECTION explicitly.");
-        if (new SqlConnectionStringBuilder(cs).InitialCatalog != "FlightBookingDB")
-            throw new InvalidOperationException("Expected local FlightBookingDB with round-trip fixtures from seed 04.");
+        // Legacy demo từng yêu cầu DB chính. Nay mọi lối ghi phải qua cùng preflight DB test.
+        FlightBooking.Testing.SqlTestPreflight.Verify(cs);
         using var connection = new MyConnection(cs).Open();
         using var select = new SqlCommand("""
             SELECT TOP(1) f.flight_id,a.fare_id,r.flight_id,b.fare_id
@@ -50,41 +50,41 @@ internal static class DemoRollbackChecks
             command.Parameters.AddWithValue("@out", outbound); command.Parameters.AddWithValue("@back", returning);
             return (string)command.ExecuteScalar()!;
         }
-        var bus = new BookingBUS(cs);
+        var bus = new DatVeBUS(cs);
         for (var quantity = 1; quantity <= 3; quantity++)
         {
-            var request = new BookingRequest
+            var request = new YeuCauDatVe
             {
                 FlightId = outbound, FareId = outboundFare, Quantity = quantity, TripType = "RoundTrip",
                 ReturnFlightId = returning, ReturnFareId = returnFare,
-                ReturnDate = bus.GetFlight(returning).DepartureDate,
+                ReturnDate = bus.DocChuyenBay(returning).NgayKhoiHanh,
                 Customer = new() { FullName = "Người đặt thử độc lập", Email = "roundtrip.rollback@example.test", Phone = "0900000000", DateOfBirth = new(2000, 1, 1), Gender = "Nam", IdPassportNumber = "TEST-BOOKER-001" },
-                Passengers = Enumerable.Range(1, quantity).Select(i => new PassengerInput
+                Passengers = Enumerable.Range(1, quantity).Select(i => new ThongTinHanhKhach
                   { FullName = "Hành khách thử " + i, IdCard = "ROLLBACK-" + i }).ToList()
             };
-            var quote = bus.QuoteJourney(request);
-            request.ExpectedTotal = quote.TotalAmount;
-            BookingBUS.Validate(request, DateOnly.FromDateTime(DateTime.Today));
+            var quote = bus.TinhGiaHanhTrinh(request);
+            request.ExpectedTotal = quote.TongTien;
+            DatVeBUS.KiemTraYeuCauDatVe(request, DateOnly.FromDateTime(DateTime.Today));
             var before = Snapshot();
             try
             {
-                new BookingDAO(new MyConnection(cs)).Write<int>(data =>
+                new DatVeDAO(new MyConnection(cs)).GhiDuLieu<int>(data =>
                 {
-                    foreach (var id in new[] { outbound, returning }.Order()) data.Flight(id, true);
-                    var customer = data.InsertCustomer(request.Customer);
-                    foreach (var leg in new[] { quote.Outbound, quote.Return! })
+                    foreach (var id in new[] { outbound, returning }.Order()) data.DocChuyenBay(id, true);
+                    var customer = data.ThemKhachDat(request.Customer);
+                    foreach (var leg in new[] { quote.LuotDi, quote.LuotVe! })
                     {
-                        var seats = BookingBUS.AllocateSeats(leg.Flight.TotalSeats, data.ActiveSeats(leg.Flight.FlightId), quantity);
-                        data.ReserveSeats(leg.Flight.FlightId, quantity);
-                        var booking = data.InsertBooking(customer, leg, DateTime.Now);
-                        var invoice = data.InsertInvoice(booking, leg, DateTime.Now);
+                        var seats = DatVeBUS.CapGhe(leg.ChuyenBay.TongSoGhe, data.DocGheHieuLuc(leg.ChuyenBay.MaChuyenBay), quantity);
+                        data.GiuGhe(leg.ChuyenBay.MaChuyenBay, quantity);
+                        var booking = data.ThemDatVe(customer, leg, DateTime.Now);
+                        var invoice = data.ThemHoaDon(booking, leg, DateTime.Now);
                         for (var i = 0; i < quantity; i++)
-                            data.InsertPassenger(booking, invoice, leg, request.Passengers[i], seats[i], DateTime.Now);
-                        var details = data.Details(booking);
-                        check(details.Count == quantity && details.Select(d => d.PassengerFullName).SequenceEqual(request.Passengers.Select(p => p.FullName)) &&
-                            details.Select(d => d.PassengerIdCard).SequenceEqual(request.Passengers.Select(p => p.IdCard)) &&
-                            details.Select(d => d.SeatNumber).Distinct().Count() == quantity,
-                            $"SQL DAO: {quantity} independent passengers/tickets on flight {leg.Flight.FlightId}");
+                            data.ThemHanhKhach(booking, invoice, leg, request.Passengers[i], seats[i], DateTime.Now);
+                        var details = data.DocChiTietDatVe(booking);
+                        check(details.Count == quantity && details.Select(d => d.HoTenHanhKhach).SequenceEqual(request.Passengers.Select(p => p.FullName)) &&
+                            details.Select(d => d.GiayToHanhKhach).SequenceEqual(request.Passengers.Select(p => p.IdCard)) &&
+                            details.Select(d => d.SoGhe).Distinct().Count() == quantity,
+                            $"SQL DAO: {quantity} independent passengers/tickets on flight {leg.ChuyenBay.MaChuyenBay}");
                     }
                     throw new RollbackProbe();
                 });

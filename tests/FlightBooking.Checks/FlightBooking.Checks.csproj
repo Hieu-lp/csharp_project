@@ -10,4 +10,9 @@
     <ProjectReference Include="../../src/FlightBooking.DAO/FlightBooking.DAO.csproj" />
     <ProjectReference Include="../../src/FlightBooking.DTO/FlightBooking.DTO.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Shared/SqlTestPreflight.cs" Link="SqlTestPreflight.cs" />
+    <Compile Include="../Shared/SqlTestPolicyChecks.cs" Link="SqlTestPolicyChecks.cs" />
+    <None Include="../Shared/SqlTestPreflight.sql" Link="SqlTestPreflight.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

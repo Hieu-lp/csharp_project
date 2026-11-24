@@ -40,20 +40,20 @@
         </section>
     </div>
     <aside><section class="panel summary"><h2>Hành trình của bạn</h2>
-        @if (Model.Quote is { } quote)
+        @if (Model.Quote is { } baoGia)
         {
-            var legs = new List<FlightBooking.DTO.BookingQuoteDTO> { quote.Outbound };
-            if (quote.Return is { } returning) legs.Add(returning);
-            @for (var n = 0; n < legs.Count; n++)
+            var cacChang = new List<FlightBooking.DTO.BaoGiaDatVeDTO> { baoGia.LuotDi };
+            if (baoGia.LuotVe is { } luotVe) cacChang.Add(luotVe);
+            @for (var n = 0; n < cacChang.Count; n++)
             {
-                var leg = legs[n];
-                <section class="leg-summary"><span class="tag">@(n == 0 ? "Lượt đi" : "Lượt về") · #@leg.Flight.FlightId · @leg.Fare.ClassName</span>
-                <h3>@leg.Flight.DepartureCity → @leg.Flight.ArrivalCity</h3>
-                <p>Đi: @leg.Flight.DepartureDate.ToString("dd/MM/yyyy") @leg.Flight.DepartureTime.ToString("HH:mm")<br />Đến: @leg.Flight.ArrivalDate.ToString("dd/MM/yyyy") @leg.Flight.ArrivalTime.ToString("HH:mm")</p>
-                <p class="muted">@leg.Quantity khách · @leg.Fare.BaseBaggageKg kg / khách · Còn @leg.Flight.SeatsAvailable chỗ</p>
-                <dl class="amounts"><dt>@leg.Quantity × @leg.Fare.Price.ToString("N0")</dt><dd>@leg.Subtotal.ToString("N0") ₫</dd><dt>Giảm giá</dt><dd>−@leg.DiscountAmount.ToString("N0") ₫</dd><dt>Thành tiền lượt</dt><dd>@leg.TotalAmount.ToString("N0") ₫</dd></dl></section>
+                var chang = cacChang[n];
+                <section class="leg-summary"><span class="tag">@(n == 0 ? "Lượt đi" : "Lượt về") · #@chang.ChuyenBay.MaChuyenBay · @chang.HangVe.TenHangVe</span>
+                <h3>@chang.ChuyenBay.ThanhPhoDi → @chang.ChuyenBay.ThanhPhoDen</h3>
+                <p>Đi: @chang.ChuyenBay.NgayKhoiHanh.ToString("dd/MM/yyyy") @chang.ChuyenBay.GioKhoiHanh.ToString("HH:mm")<br />Đến: @chang.ChuyenBay.NgayDen.ToString("dd/MM/yyyy") @chang.ChuyenBay.GioDen.ToString("HH:mm")</p>
+                <p class="muted">@chang.SoLuong khách · @chang.HangVe.HanhLyCoBanKg kg / khách · Còn @chang.ChuyenBay.SoGheCon chỗ</p>
+                <dl class="amounts"><dt>@chang.SoLuong × @chang.HangVe.GiaVe.ToString("N2")</dt><dd>@chang.TamTinh.ToString("N2") ₫</dd><dt>Giảm giá</dt><dd>−@chang.TienGiam.ToString("N2") ₫</dd><dt>Thành tiền lượt</dt><dd>@chang.TongTien.ToString("N2") ₫</dd></dl></section>
             }
-            <dl class="amounts"><dt class="total">Tổng hành trình</dt><dd class="total">@quote.TotalAmount.ToString("N0") ₫</dd></dl>
+            <dl class="amounts"><dt class="total">Tổng hành trình</dt><dd class="total">@baoGia.TongTien.ToString("N2") ₫</dd></dl>
         }
         <label asp-for="Input.DiscountCode">Mã giảm giá</label><input asp-for="Input.DiscountCode" maxlength="50" /><span asp-validation-for="Input.DiscountCode"></span>
         <button class="button secondary full" id="apply-discount" type="submit" name="action" value="quote" formnovalidate>Tính lại giá / áp mã</button>

@@ -11,7 +11,7 @@ internal static class InteractionChecks
     private static IEnumerable<Control> Controls(Control parent) => parent.Controls.Cast<Control>()
         .SelectMany(child => new[] { child }.Concat(Controls(child)));
     private static void Click(Control parent, string text) => Controls(parent).OfType<Button>().Single(b => b.Text == text).PerformClick();
-    private static async Task Idle(ManagementPage page)
+    private static async Task Idle(TrangQuanLy page)
     {
         var timeout = Stopwatch.StartNew();
         while (Field<bool>(page, "busy"))
@@ -24,9 +24,9 @@ internal static class InteractionChecks
     public static async Task Run(Form host, string readConnection, Action<bool, string> check)
     {
         // Validation dùng BUS không có connection: không thể ghi lên database chính.
-        using (var airport = new ManagementPage(new ManagementBUS(""), CatalogKind.Airport))
+        using (var airport = new TrangQuanLy(new QuanLyBUS(""), LoaiDanhMuc.SanBay))
         {
-            host.Controls.Add(airport); await airport.EnsureLoaded();
+            host.Controls.Add(airport); await airport.DamBaoDaTai();
             var fields = Field<Dictionary<string, Control>>(airport, "fields");
             var errors = Field<ErrorProvider>(airport, "errors");
             Click(airport, "Thêm mới"); Click(airport, "Lưu"); await Idle(airport);
@@ -37,7 +37,7 @@ internal static class InteractionChecks
             check(fields["name"].Text == "GUI validation only" && fields["city"].Text.Length == 101,
                 "failed validation preserves all entered text");
             // Cùng thông báo do ManagementBUS.SaveAirport trả khi trùng; không INSERT fixture SQL.
-            typeof(ManagementPage).GetMethod("MarkErrors", BindingFlags.Instance | BindingFlags.NonPublic)!
+            typeof(TrangQuanLy).GetMethod("DanhDauLoi", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(airport, ["Đã có sân bay cùng tên và thành phố."]);
             check(errors.GetError(fields["name"]).Length > 0 && errors.GetError(fields["city"]).Length > 0,
                 "duplicate airport error marks name and city");
@@ -45,13 +45,13 @@ internal static class InteractionChecks
             check(fields["name"].Text.Length == 0 && errors.GetError(fields["name"]).Length == 0,
                 "cancel clears validation errors and restores view");
             Click(airport, "Thêm mới");
-            var cleanPrompt = Respond(host, () => airport.CanLeave(), DialogResult.No);
+            var cleanPrompt = Respond(host, () => airport.CoTheRoiTrang(), DialogResult.No);
             check(!cleanPrompt, "opening a new editor without typing does not prompt");
             host.Controls.Remove(airport);
         }
-        using (var flight = new ManagementPage(new ManagementBUS(""), CatalogKind.Flight))
+        using (var flight = new TrangQuanLy(new QuanLyBUS(""), LoaiDanhMuc.ChuyenBay))
         {
-            host.Controls.Add(flight); await flight.EnsureLoaded();
+            host.Controls.Add(flight); await flight.DamBaoDaTai();
             Click(flight, "Thêm mới");
             Click(flight, "Lưu"); await Idle(flight);
             var fields = Field<Dictionary<string, Control>>(flight, "fields");
@@ -60,9 +60,9 @@ internal static class InteractionChecks
                 "AddFlight GUI path marks both missing airports without an SQL connection");
             Click(flight, "Hủy thay đổi"); host.Controls.Remove(flight);
         }
-        using (var fare = new ManagementPage(new ManagementBUS(""), CatalogKind.Fare))
+        using (var fare = new TrangQuanLy(new QuanLyBUS(""), LoaiDanhMuc.HangVe))
         {
-            host.Controls.Add(fare); await fare.EnsureLoaded();
+            host.Controls.Add(fare); await fare.DamBaoDaTai();
             Click(fare, "Thêm mới");
             Field<Dictionary<string, Control>>(fare, "fields")["name"].Text = "GUI validation only";
             Click(fare, "Lưu"); await Idle(fare);
@@ -84,8 +84,8 @@ internal static class InteractionChecks
             main.Show();
             await Task.Yield();
             var tabs = Controls(main).OfType<TabControl>().Single();
-            var page = tabs.TabPages[0].Controls.OfType<ManagementPage>().Single();
-            await page.EnsureLoaded();
+            var page = tabs.TabPages[0].Controls.OfType<TrangQuanLy>().Single();
+            await page.DamBaoDaTai();
             await Idle(page);
             check(tabs.TabCount == 3, "main form has three management tabs");
             Click(page, "Thêm mới");
@@ -108,8 +108,8 @@ internal static class InteractionChecks
                 "No on closing keeps the main form open");
             check(Respond(main, () => SelectTab(tabs, 1), DialogResult.Yes) && tabs.SelectedIndex == 1,
                 "Yes discards changes and switches tab");
-            var flightPage = tabs.TabPages[1].Controls.OfType<ManagementPage>().Single();
-            await flightPage.EnsureLoaded();
+            var flightPage = tabs.TabPages[1].Controls.OfType<TrangQuanLy>().Single();
+            await flightPage.DamBaoDaTai();
             check(Screen.FromControl(main).WorkingArea.Contains(main.Bounds), "main form fits actual screen working area");
             var pageBounds = flightPage.RectangleToScreen(flightPage.ClientRectangle);
             var saveButton = Field<Button>(flightPage, "save"); var cancelButton = Field<Button>(flightPage, "cancel");
@@ -127,14 +127,14 @@ internal static class InteractionChecks
                 "closing a clean main form does not prompt");
         }
 
-        using var picker = new SelectionDialog("GUI Escape check", ["fixture"], value => value.ToString()!);
+        using var picker = new HopThoaiChon("GUI Escape check", ["fixture"], value => value.ToString()!);
         picker.Shown += (_, _) => picker.BeginInvoke(new Action(() =>
         {
             // Gửi phím tới chính Form đang kiểm tra, không gửi bàn phím toàn desktop.
             typeof(Form).GetMethod("ProcessDialogKey", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(picker, [Keys.Escape]);
         }));
-        check(picker.ShowDialog(host) == DialogResult.Cancel && SelectionDialog.SelectedValue is null,
+        check(picker.ShowDialog(host) == DialogResult.Cancel && HopThoaiChon.GiaTriDaChon is null,
             "Escape dialog routing cancels picker and clears static selection");
     }
 

@@ -4,7 +4,7 @@ using FlightBooking.BUS;
 using FlightBooking.DTO;
 using FlightBooking.WinForms;
 
-// Chỉ tải/chọn/lọc dữ liệu. Không gọi Save/Delete hoặc tạo dữ liệu kiểm thử trên SQL.
+// Default modes only read; --sql-sync is separately guarded and uses only the approved test DB.
 internal static class Program
 {
     private static int checks;
@@ -21,20 +21,22 @@ internal static class Program
     {
         var connection = Environment.GetEnvironmentVariable("FLIGHTBOOKING_UI_READ_CONNECTION");
         bool dropdownOnly = args.Contains("--dropdown-only");
-        if (!dropdownOnly && string.IsNullOrWhiteSpace(connection))
+        bool sqlSync = args.Contains("--sql-sync");
+        if (!sqlSync && !dropdownOnly && string.IsNullOrWhiteSpace(connection))
             throw new InvalidOperationException("Set FLIGHTBOOKING_UI_READ_CONNECTION; checks only read existing data.");
         ApplicationConfiguration.Initialize();
         System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("vi-VN");
-        using var host = new Form { Text = "BookingFlight · Kiểm tra GUI chỉ đọc", Size = new(1320, 740) };
+        using var host = new Form { Text = sqlSync ? "BookingFlight · Kiểm thử GUI/Web · DATABASE TEST" : "BookingFlight · Kiểm tra GUI chỉ đọc", Size = new(1320, 740) };
         host.Shown += async (_, _) =>
         {
             try
             {
+                if (sqlSync) { await SqlSyncChecks.Run(host, Check); return; }
                 if (!dropdownOnly)
                 {
-                    await Run(host, new ManagementBUS(connection!));
+                    await Run(host, new QuanLyBUS(connection!));
                     if (args.Contains("--interaction")) await InteractionChecks.Run(host, connection!, Check);
-                    if (args.Contains("--layout")) await LayoutChecks.Run(host, new ManagementBUS(connection!), Check);
+                    if (args.Contains("--layout")) await LayoutChecks.Run(host, new QuanLyBUS(connection!), Check);
                 }
                 await AirportDropDownChecks.Run(host, Check);
             }
@@ -45,33 +47,33 @@ internal static class Program
         if (Environment.ExitCode == 0) Console.WriteLine($"{checks} GUI checks passed.");
     }
 
-    private static async Task Run(Form host, ManagementBUS bus)
+    private static async Task Run(Form host, QuanLyBUS bus)
     {
-        using var flightPage = new ManagementPage(bus, CatalogKind.Flight);
+        using var flightPage = new TrangQuanLy(bus, LoaiDanhMuc.ChuyenBay);
         host.Controls.Add(flightPage);
-        await flightPage.EnsureLoaded();
+        await flightPage.DamBaoDaTai();
         Check(Field<bool>(flightPage, "loaded"), "flight page loads through BUS/DAO");
-        var flights = Field<ArrayList>(flightPage, "flights").Cast<FlightManagementDTO>().ToList();
-        var fares = Field<ArrayList>(flightPage, "fares").Cast<FareClassDTO>().ToList();
+        var flights = Field<ArrayList>(flightPage, "flights").Cast<QuanLyChuyenBayDTO>().ToList();
+        var fares = Field<ArrayList>(flightPage, "fares").Cast<HangVeDTO>().ToList();
         Check(flights.Count > 0, "database has existing flights to inspect");
         var list = Field<ListView>(flightPage, "list");
         var children = Field<ListView>(flightPage, "children");
         foreach (ListViewItem item in list.Items)
         {
             item.Selected = true;
-            var flight = (FlightManagementDTO)item.Tag!;
-            var expected = fares.Where(f => f.FlightId == flight.Flight.FlightId).Select(f => f.FareId.ToString()).ToArray();
+            var flight = (QuanLyChuyenBayDTO)item.Tag!;
+            var expected = fares.Where(f => f.MaChuyenBay == flight.ChuyenBay.MaChuyenBay).Select(f => f.MaHangVe.ToString()).ToArray();
             Check(children.Items.Cast<ListViewItem>().Select(i => i.Text).SequenceEqual(expected),
-                "linked ListViews only show fares of flight " + flight.Flight.FlightId);
+                "linked ListViews only show fares of flight " + flight.ChuyenBay.MaChuyenBay);
         }
         var systemFields = Field<Dictionary<string, Control>>(flightPage, "fields");
         Check(new[] { "id", "sold", "available", "revenue" }.All(k => ((TextBox)systemFields[k]).ReadOnly),
             "system fields are read-only");
         host.Controls.Remove(flightPage);
 
-        using var farePage = new ManagementPage(bus, CatalogKind.Fare);
+        using var farePage = new TrangQuanLy(bus, LoaiDanhMuc.HangVe);
         host.Controls.Add(farePage);
-        await farePage.EnsureLoaded();
+        await farePage.DamBaoDaTai();
         Check(Field<bool>(farePage, "loaded"), "fare page initially loads");
         // Mô phỏng tab đã tải trước khi chuyến/hạng xuất hiện ở tab khác.
         Field<ArrayList>(farePage, "flights").Clear();
@@ -79,29 +81,29 @@ internal static class Program
         Field<ComboBox>(farePage, "fareScope").DataSource = null;
         var fields = Field<Dictionary<string, Control>>(farePage, "fields");
         ((ComboBox)fields["flight"]).DataSource = null;
-        var selected = flights.First(f => fares.Any(fare => fare.FlightId == f.Flight.FlightId)).Flight.FlightId;
-        await farePage.ShowFares(selected);
+        var selected = flights.First(f => fares.Any(fare => fare.MaChuyenBay == f.ChuyenBay.MaChuyenBay)).ChuyenBay.MaChuyenBay;
+        await farePage.HienThiHangVe(selected);
         Check(Field<ArrayList>(farePage, "flights").Count == flights.Count, "opening fares refreshes stale flight cache");
         Check((int?)Field<ComboBox>(farePage, "fareScope").SelectedValue == selected, "fare scope matches requested flight");
         Check((int?)((ComboBox)fields["flight"]).SelectedValue == selected, "new fare defaults to requested flight");
-        Check(Field<ListView>(farePage, "list").Items.Count == fares.Count(f => f.FlightId == selected), "refreshed fare list matches selected flight");
+        Check(Field<ListView>(farePage, "list").Items.Count == fares.Count(f => f.MaChuyenBay == selected), "refreshed fare list matches selected flight");
         host.Controls.Remove(farePage);
 
-        using (var firstOpen = new ManagementPage(bus, CatalogKind.Fare))
+        using (var firstOpen = new TrangQuanLy(bus, LoaiDanhMuc.HangVe))
         {
             // VisibleChanged bắt đầu tải bất đồng bộ ngay khi gắn tab lần đầu.
             host.Controls.Add(firstOpen);
-            var initialLoad = firstOpen.EnsureLoaded();
-            await firstOpen.ShowFares(selected);
+            var initialLoad = firstOpen.DamBaoDaTai();
+            await firstOpen.HienThiHangVe(selected);
             await initialLoad;
             Check((int?)Field<ComboBox>(firstOpen, "fareScope").SelectedValue == selected,
                 "first opening waits for initial load and keeps requested flight");
             host.Controls.Remove(firstOpen);
         }
 
-        var airports = bus.Airports().Cast<object>().ToList();
+        var airports = bus.DocDSSanBay().Cast<object>().ToList();
         Check(airports.Count > 0, "database has existing airports to select");
-        using (var picker = new SelectionDialog("Kiểm tra chọn sân bay", airports, o => ((AirportDTO)o).AirportName))
+        using (var picker = new HopThoaiChon("Kiểm tra chọn sân bay", airports, o => ((SanBayDTO)o).TenSanBay))
         {
             picker.Shown += (_, _) =>
             {
@@ -109,19 +111,19 @@ internal static class Program
                 pickerList.Items[0].Selected = true;
                 ((Button)picker.AcceptButton!).PerformClick();
             };
-            Check(picker.ShowDialog(host) == DialogResult.OK && Equals(SelectionDialog.SelectedValue, airports[0]), "selection returns exact DTO through static value");
+            Check(picker.ShowDialog(host) == DialogResult.OK && Equals(HopThoaiChon.GiaTriDaChon, airports[0]), "selection returns exact DTO through static value");
         }
-        using (var picker = new SelectionDialog("Kiểm tra hủy", airports, o => ((AirportDTO)o).AirportName))
+        using (var picker = new HopThoaiChon("Kiểm tra hủy", airports, o => ((SanBayDTO)o).TenSanBay))
         {
-            Check(SelectionDialog.SelectedValue is null, "opening picker clears previous static selection");
+            Check(HopThoaiChon.GiaTriDaChon is null, "opening picker clears previous static selection");
             picker.Shown += (_, _) => ((Button)picker.CancelButton!).PerformClick();
-            Check(picker.ShowDialog(host) == DialogResult.Cancel && SelectionDialog.SelectedValue is null, "cancel leaves no stale selection");
+            Check(picker.ShowDialog(host) == DialogResult.Cancel && HopThoaiChon.GiaTriDaChon is null, "cancel leaves no stale selection");
         }
-        using (var picker = new SelectionDialog("Kiểm tra đóng", airports, o => ((AirportDTO)o).AirportName))
+        using (var picker = new HopThoaiChon("Kiểm tra đóng", airports, o => ((SanBayDTO)o).TenSanBay))
         {
             picker.Shown += (_, _) => picker.Close();
             picker.ShowDialog(host);
-            Check(SelectionDialog.SelectedValue is null, "closing picker leaves no selection");
+            Check(HopThoaiChon.GiaTriDaChon is null, "closing picker leaves no selection");
         }
     }
 

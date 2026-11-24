@@ -7,9 +7,9 @@ internal static class AirportDropDownChecks
     public static async Task Run(Form host, Action<bool, string> check)
     {
         // Dữ liệu hiển thị trong bộ nhớ; BUS cấu hình rỗng, không thể ghi/kết nối SQL.
-        using var page = new ManagementPage(new ManagementBUS(""), CatalogKind.Flight);
+        using var page = new TrangQuanLy(new QuanLyBUS(""), LoaiDanhMuc.ChuyenBay);
         host.Controls.Add(page);
-        await page.EnsureLoaded();
+        await page.DamBaoDaTai();
         var fields = Field<Dictionary<string, Control>>(page, "fields");
         var tips = Field<ToolTip>(page, "airportTips");
         Controls(page).OfType<Button>().Single(b => b.Text == "Thêm mới").PerformClick();

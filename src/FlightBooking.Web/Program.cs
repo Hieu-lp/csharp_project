@@ -6,7 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
-builder.Services.AddSingleton(new BookingBUS(builder.Configuration.GetConnectionString("FlightBookingDB") ?? ""));
+builder.Services.AddSingleton(new DatVeBUS(builder.Configuration.GetConnectionString("FlightBookingDB") ?? ""));
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {

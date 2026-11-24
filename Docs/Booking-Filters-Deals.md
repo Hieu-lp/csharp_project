@@ -1,5 +1,8 @@
 # Bộ lọc khách hàng và chuyến bay giá tốt — 21/11/2026
 
+> Tài liệu nghiệp vụ của Thịnh được giữ theo quyền sở hữu. Hướng dẫn chạy hiện tại
+> nằm trong [README](../README.md); số test/ID/ngày và các mô tả thay đổi bên dưới là lịch sử.
+
 Phạm vi: website của Thịnh trên `feature/razor-booking`. Không thay đổi Database,
 ERD, dữ liệu, WinForms hoặc tự merge PR. Các thay đổi có trước được giữ nguyên.
 
@@ -7,9 +10,9 @@ ERD, dữ liệu, WinForms hoặc tự merge PR. Các thay đổi có trước �
 
 - `Pages/Index.cshtml` và `.cshtml.cs`: khoảng giá thấp nhất/cao nhất, hạng vé
   thực tế, Áp dụng/Xóa; giữ hành trình và số khách, kể cả khi nhập giá sai.
-- `BookingModels.cs`, `BookingBUS.cs`: kiểm tra VND, lọc ArrayList theo khoảng
+- `BookingModels.cs`, `DatVeBUS.cs`: kiểm tra VND, lọc ArrayList theo khoảng
   giá và tên hạng khớp hoàn toàn; giữ API phép so sánh, AND/OR/NOT cũ cho nơi khác.
-- `BookingDAO.cs`: đọc danh sách hạng vé và tối đa 4 chuyến giá thấp bằng SQL.
+- `DatVeDAO.cs`: đọc danh sách hạng vé và tối đa 4 chuyến giá thấp bằng SQL.
 - `wwwroot/css/site.css`, `wwwroot/js/search.js`: giao diện xanh–trắng, 4/2/1
   cột theo kích thước; đổi số khách tự gửi lại để server tính tiền/kiểm tra ghế.
 
