@@ -1,0 +1,26 @@
+﻿{
+  "target": "FlightBooking_Hieu_ManagementTests",
+  "source_sha256": {
+    "02_CreateTables.sql": "98C3E1C1E23A37F9D6B741EF8879E355C7BA0EB659DBE333DFACB6E3CEDA4AAB",
+    "03_Constraints_Indexes.sql": "282A4907BF59E65AB0E3212236B08B7AE56378AC71DF1BFD337CCFCE641E450B",
+    "08_BookingWebRequest.sql": "4B65D4AA7FD6226AB125059D38198C372A33184FB7FBC9C5CDBCF7FF8F5C78C7"
+  },
+  "schema_fingerprint": "B6297CED0C16E1050E6BA00FBA93A60BBBBC1157622289556918CF61B0416D34",
+  "tables": [
+    "AIRPORT",
+    "CUSTOMER",
+    "EMPLOYEE",
+    "DISCOUNT_CODE",
+    "FLIGHT",
+    "FARE_CLASS",
+    "TICKET",
+    "BOOKING",
+    "BOOKING_DETAIL",
+    "INVOICE",
+    "INVOICE_DETAIL",
+    "BOOKING_WEB_REQUEST"
+  ],
+  "column_count": 86,
+  "constraint_count": 77,
+  "guarded_source_batches": 23
+}

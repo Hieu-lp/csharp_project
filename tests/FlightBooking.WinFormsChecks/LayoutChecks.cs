@@ -4,13 +4,13 @@ using FlightBooking.WinForms;
 
 internal static class LayoutChecks
 {
-    public static async Task Run(Form host, ManagementBUS bus, Action<bool, string> check)
+    public static async Task Run(Form host, QuanLyBUS bus, Action<bool, string> check)
     {
         var evidence = Path.Combine("tmp", "teacher-reference-20261123", "evidence");
         Directory.CreateDirectory(evidence);
         Console.WriteLine($"DISPLAY: {Screen.FromControl(host).Bounds}; actual DeviceDpi={host.DeviceDpi}. Windows display settings are unchanged.");
         foreach (var size in new[] { new Size(1366, 768), new Size(1920, 1080) })
-        foreach (var kind in Enum.GetValues<CatalogKind>())
+        foreach (var kind in Enum.GetValues<LoaiDanhMuc>())
         {
             host.Location = Point.Empty;
             host.Size = size;
@@ -19,8 +19,8 @@ internal static class LayoutChecks
                 Console.WriteLine($"SKIP: {kind} requested {size.Width}x{size.Height}; Windows limited the actual window to {host.Width}x{host.Height}.");
                 continue;
             }
-            using var page = new ManagementPage(bus, kind);
-            host.Controls.Add(page); await page.EnsureLoaded(); page.CreateControl(); host.PerformLayout();
+            using var page = new TrangQuanLy(bus, kind);
+            host.Controls.Add(page); await page.DamBaoDaTai(); page.CreateControl(); host.PerformLayout();
             foreach (var expanded in new[] { false, true })
             {
                 var advanced = Field<Control>(page, "advanced"); advanced.Visible = expanded;

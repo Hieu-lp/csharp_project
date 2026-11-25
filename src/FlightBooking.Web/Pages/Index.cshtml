@@ -38,7 +38,7 @@
         <div class="airport-pair">
             <div class="search-field"><label asp-for="Search.DepartureAirportId">Từ</label>
                 <select asp-for="Search.DepartureAirportId" disabled="@Model.IsDealSelection" required><option value="">Chọn điểm đi</option>
-                    @foreach (var a in Model.Airports) { <option value="@a.AirportId">@a.City · @a.AirportName</option> }
+                    @foreach (var sanBay in Model.Airports) { <option value="@sanBay.MaSanBay">@sanBay.ThanhPho · @sanBay.TenSanBay</option> }
                 </select>
             </div>
             <button class="swap-airports" type="button" id="swap-airports" aria-label="Đổi chỗ điểm đi và điểm đến" hidden>
@@ -46,7 +46,7 @@
             </button>
             <div class="search-field"><label asp-for="Search.ArrivalAirportId">Đến</label>
                 <select asp-for="Search.ArrivalAirportId" disabled="@Model.IsDealSelection" required><option value="">Chọn điểm đến</option>
-                    @foreach (var a in Model.Airports) { <option value="@a.AirportId">@a.City · @a.AirportName</option> }
+                    @foreach (var sanBay in Model.Airports) { <option value="@sanBay.MaSanBay">@sanBay.ThanhPho · @sanBay.TenSanBay</option> }
                 </select>
             </div>
         </div>
@@ -55,7 +55,7 @@
         <button class="button search-submit" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>@(Model.IsDealSelection ? "Cập nhật số người" : "Tìm chuyến bay")</button>
     </div>
     <p id="arrival-hint" class="search-hint">@(Model.IsDealSelection ? "Đổi số người để kiểm tra lại chỗ và tổng tiền. Chỉ giữ chỗ khi bạn xác nhận đặt vé ở bước tiếp theo." : "Khứ hồi: chọn lượt đi, sau đó chọn lượt về. Lượt về khởi hành sau khi lượt đi hạ cánh.")</p>
-    @if (Model.IsDealSelection) { <a class="change-journey" asp-page="/Index" asp-all-route-data="Model.SearchRoute()">← Đổi hành trình</a> }
+    @if (Model.IsDealSelection) { <a class="change-journey" asp-page="/Index" asp-all-route-data="Model.TaoDuongDanTimKiem()">← Đổi hành trình</a> }
     <p id="swap-feedback" class="sr-only" role="status" aria-live="polite"></p>
     @if (!Model.IsDealSelection)
     {
@@ -76,21 +76,21 @@
 </section>
 }
 @if (Model.Error is not null) { <div class="alert" id="flight-results" role="alert">@Model.Error <a asp-page="/Index">Chọn chuyến khác</a></div> }
-@if (Model.IsDealSelection && Model.DealSelection is { } selection && Model.Error is null)
+@if (Model.IsDealSelection && Model.DealSelection is { } luaChonDaChon && Model.Error is null)
 {
-    var q = selection.Quote;
+    var baoGia = luaChonDaChon.BaoGia;
     <section id="flight-results" class="selected-flight" aria-labelledby="selected-title">
-        <div class="section-heading"><h2 id="selected-title">Chuyến bay đã chọn</h2><span>Một chiều · @q.Quantity hành khách</span></div>
+        <div class="section-heading"><h2 id="selected-title">Chuyến bay đã chọn</h2><span>Một chiều · @baoGia.SoLuong hành khách</span></div>
         <article class="panel flight-card">
-            <div><span class="tag">Chuyến #@q.Flight.FlightId · @q.Fare.ClassName</span><h3>@q.Flight.DepartureCity → @q.Flight.ArrivalCity</h3>
-            <p>@q.Flight.DepartureAirport → @q.Flight.ArrivalAirport</p>
-            <p>Đi: @q.Flight.DepartureDate.ToString("dd/MM/yyyy") @q.Flight.DepartureTime.ToString("HH:mm")<br />Đến: @q.Flight.ArrivalDate.ToString("dd/MM/yyyy") @q.Flight.ArrivalTime.ToString("HH:mm")</p>
-            <p class="muted">Hành lý @q.Fare.BaseBaggageKg kg / người · Còn @q.Flight.SeatsAvailable chỗ toàn chuyến</p>
-            @if (!selection.HasSeats) { <p class="alert" role="alert">Chuyến này chỉ còn @q.Flight.SeatsAvailable chỗ, không đủ cho @q.Quantity người. Giảm số người hoặc đổi chuyến.</p> }
+            <div><span class="tag">Chuyến #@baoGia.ChuyenBay.MaChuyenBay · @baoGia.HangVe.TenHangVe</span><h3>@baoGia.ChuyenBay.ThanhPhoDi → @baoGia.ChuyenBay.ThanhPhoDen</h3>
+            <p>@baoGia.ChuyenBay.SanBayDi → @baoGia.ChuyenBay.SanBayDen</p>
+            <p>Đi: @baoGia.ChuyenBay.NgayKhoiHanh.ToString("dd/MM/yyyy") @baoGia.ChuyenBay.GioKhoiHanh.ToString("HH:mm")<br />Đến: @baoGia.ChuyenBay.NgayDen.ToString("dd/MM/yyyy") @baoGia.ChuyenBay.GioDen.ToString("HH:mm")</p>
+            <p class="muted">Hành lý @baoGia.HangVe.HanhLyCoBanKg kg / người · Còn @baoGia.ChuyenBay.SoGheCon chỗ toàn chuyến</p>
+            @if (!luaChonDaChon.ConDuGhe) { <p class="alert" role="alert">Chuyến này chỉ còn @baoGia.ChuyenBay.SoGheCon chỗ, không đủ cho @baoGia.SoLuong người. Giảm số người hoặc đổi chuyến.</p> }
             </div>
-            <div class="fare"><strong>@q.Fare.Price.ToString("N0") <small>VND</small></strong><span>/ hành khách / một chiều</span>
-                <div class="selected-total">Tổng @q.Quantity người: <strong>@q.TotalAmount.ToString("N0") ₫</strong></div>
-                <button class="button" type="submit" form="flight-search" name="ContinueDeal" value="true" disabled="@(!selection.HasSeats)">Tiếp tục đặt vé</button>
+            <div class="fare"><strong>@baoGia.HangVe.GiaVe.ToString("N2") <small>VND</small></strong><span>/ hành khách / một chiều</span>
+                <div class="selected-total">Tổng @baoGia.SoLuong người: <strong>@baoGia.TongTien.ToString("N2") ₫</strong></div>
+                <button class="button" type="submit" form="flight-search" name="ContinueDeal" value="true" disabled="@(!luaChonDaChon.ConDuGhe)">Tiếp tục đặt vé</button>
             </div>
         </article>
     </section>
@@ -98,23 +98,23 @@
 @if (!Model.IsDealSelection && Model.Submitted && Model.Error is null)
 {
     <section id="flight-results" aria-labelledby="results-title"><div class="section-heading"><h2 id="results-title">@(Model.SelectingReturn ? "Chọn chuyến về" : "Chọn chuyến đi")</h2><span>@Model.Offers.Count lựa chọn hạng vé</span></div>
-    @if (Model.Outbound is { } selected)
+    @if (Model.Outbound is { } daChon)
     {
-        <p class="muted">Đang tìm lượt về: @selected.Flight.ArrivalCity → @selected.Flight.DepartureCity · @Model.Search.ReturnDate?.ToString("dd/MM/yyyy"). Khoảng giá và hạng vé hiện tại cũng áp dụng cho lượt về.</p>
-        <div class="notice">Lượt đi: @selected.Flight.DepartureCity → @selected.Flight.ArrivalCity · @selected.Flight.DepartureDate.ToString("dd/MM/yyyy") @selected.Flight.DepartureTime.ToString("HH:mm") · @selected.TotalAmount.ToString("N0") ₫ / @selected.Quantity khách.
-        <a asp-page="/Index" asp-all-route-data="Model.SearchRoute()">Chọn lại lượt đi</a></div>
+        <p class="muted">Đang tìm lượt về: @daChon.ChuyenBay.ThanhPhoDen → @daChon.ChuyenBay.ThanhPhoDi · @Model.Search.ReturnDate?.ToString("dd/MM/yyyy"). Khoảng giá và hạng vé hiện tại cũng áp dụng cho lượt về.</p>
+        <div class="notice">Lượt đi: @daChon.ChuyenBay.ThanhPhoDi → @daChon.ChuyenBay.ThanhPhoDen · @daChon.ChuyenBay.NgayKhoiHanh.ToString("dd/MM/yyyy") @daChon.ChuyenBay.GioKhoiHanh.ToString("HH:mm") · @daChon.TongTien.ToString("N2") ₫ / @daChon.SoLuong khách.
+        <a asp-page="/Index" asp-all-route-data="Model.TaoDuongDanTimKiem()">Chọn lại lượt đi</a></div>
     }
     @if (Model.Offers.Count == 0) { <div class="panel empty"><h3>Chưa có chuyến phù hợp</h3><p>Thử đổi ngày bay hoặc nới điều kiện lọc.</p></div> }
-    @foreach (FlightOfferDTO offer in Model.Offers)
+    @foreach (LuaChonChuyenBayDTO luaChon in Model.Offers)
     {
         <article class="panel flight-card">
-            <div><span class="tag">Chuyến #@offer.Flight.FlightId · @offer.Fare.ClassName</span><p class="muted">@offer.Flight.DepartureDate.ToString("dd/MM/yyyy")</p>
-                <div class="route"><div><strong>@offer.Flight.DepartureTime.ToString("HH:mm")</strong><span>@offer.Flight.DepartureCity</span></div><span class="route-line" aria-hidden="true">──── →</span>
-                <div><strong>@offer.Flight.ArrivalTime.ToString("HH:mm")</strong><span>@offer.Flight.ArrivalCity</span></div></div>
-                <p class="muted">Đến ngày @offer.Flight.ArrivalDate.ToString("dd/MM/yyyy") · Hành lý @offer.Fare.BaseBaggageKg kg · Còn @offer.Flight.SeatsAvailable chỗ toàn chuyến</p>
+            <div><span class="tag">Chuyến #@luaChon.ChuyenBay.MaChuyenBay · @luaChon.HangVe.TenHangVe</span><p class="muted">@luaChon.ChuyenBay.NgayKhoiHanh.ToString("dd/MM/yyyy")</p>
+                <div class="route"><div><strong>@luaChon.ChuyenBay.GioKhoiHanh.ToString("HH:mm")</strong><span>@luaChon.ChuyenBay.ThanhPhoDi</span></div><span class="route-line" aria-hidden="true">──── →</span>
+                <div><strong>@luaChon.ChuyenBay.GioDen.ToString("HH:mm")</strong><span>@luaChon.ChuyenBay.ThanhPhoDen</span></div></div>
+                <p class="muted">Đến ngày @luaChon.ChuyenBay.NgayDen.ToString("dd/MM/yyyy") · Hành lý @luaChon.HangVe.HanhLyCoBanKg kg · Còn @luaChon.ChuyenBay.SoGheCon chỗ toàn chuyến</p>
             </div>
-            <div class="fare"><strong>@offer.Fare.Price.ToString("N0") <small>VND</small></strong><span>/ hành khách</span>
-                <button class="button" type="submit" form="flight-search" name="SelectedOffer" value="@($"{offer.Flight.FlightId}:{offer.Fare.FareId}")">@(Model.SelectingReturn ? "Chọn lượt về" : "Chọn hạng vé")</button></div>
+            <div class="fare"><strong>@luaChon.HangVe.GiaVe.ToString("N2") <small>VND</small></strong><span>/ hành khách</span>
+                <button class="button" type="submit" form="flight-search" name="SelectedOffer" value="@($"{luaChon.ChuyenBay.MaChuyenBay}:{luaChon.HangVe.MaHangVe}")">@(Model.SelectingReturn ? "Chọn lượt về" : "Chọn hạng vé")</button></div>
         </article>
     }
     </section>
@@ -125,13 +125,13 @@
         <div class="deals-heading"><div><span class="eyebrow">GỢI Ý CHO HÀNH TRÌNH TIẾP THEO</span><h2 id="deals-title">Chuyến bay <span>giá tốt</span></h2></div><p>Giá thấp đang có cho những chuyến còn chỗ.</p></div>
         @if (Model.Deals.Count == 0) { <div class="panel empty"><h3>Chưa có chuyến mở bán phù hợp</h3><p>Bạn có thể tìm theo hành trình và ngày dự kiến ở phía trên.</p></div> }
         <div class="deals-grid">
-        @foreach (var deal in Model.Deals)
+        @foreach (var uuDai in Model.Deals)
         {
-            <button class="deal-card" type="submit" form="flight-search" name="SelectedDeal" value="@($"{deal.Flight.FlightId}:{deal.Fare.FareId}")" formnovalidate>
-                <div class="destination-art"><img src="~/images/destinations/placeholder.svg" width="640" height="360" loading="lazy" alt="" /><span class="deal-badge">Một chiều</span><span class="destination-label">@deal.Flight.ArrivalCity</span></div>
-                <div class="deal-content"><h3>@deal.Flight.DepartureCity <span aria-hidden="true">→</span> @deal.Flight.ArrivalCity</h3>
-                <p>@deal.Flight.DepartureDate.ToString("dd/MM/yyyy") · @deal.Fare.ClassName</p>
-                <div class="deal-price"><span>Giá từ</span><strong>@deal.Fare.Price.ToString("N0") <small>VND</small></strong><span>/ hành khách / một chiều</span></div>
+            <button class="deal-card" type="submit" form="flight-search" name="SelectedDeal" value="@($"{uuDai.ChuyenBay.MaChuyenBay}:{uuDai.HangVe.MaHangVe}")" formnovalidate>
+                <div class="destination-art"><img src="~/images/destinations/placeholder.svg" width="640" height="360" loading="lazy" alt="" /><span class="deal-badge">Một chiều</span><span class="destination-label">@uuDai.ChuyenBay.ThanhPhoDen</span></div>
+                <div class="deal-content"><h3>@uuDai.ChuyenBay.ThanhPhoDi <span aria-hidden="true">→</span> @uuDai.ChuyenBay.ThanhPhoDen</h3>
+                <p>@uuDai.ChuyenBay.NgayKhoiHanh.ToString("dd/MM/yyyy") · @uuDai.HangVe.TenHangVe</p>
+                <div class="deal-price"><span>Giá từ</span><strong>@uuDai.HangVe.GiaVe.ToString("N2") <small>VND</small></strong><span>/ hành khách / một chiều</span></div>
                 <span class="deal-cta">Xem chuyến bay <span aria-hidden="true">→</span></span></div>
             </button>
         }

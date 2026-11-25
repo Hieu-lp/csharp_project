@@ -1,5 +1,8 @@
 # Dữ liệu thử khứ hồi và form hành khách — 21/11/2026
 
+> Tài liệu nghiệp vụ của Thịnh được giữ theo quyền sở hữu. Hướng dẫn chạy hiện tại
+> nằm trong [README](../README.md); số test/ID/ngày và các mô tả thay đổi bên dưới là lịch sử.
+
 ## Database và script
 
 Hiện dùng `Database/04_SeedDemoData.sql` để khởi tạo các chuyến khứ hồi cùng dữ liệu gốc.

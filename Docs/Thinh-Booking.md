@@ -1,5 +1,8 @@
 # Phần Thịnh — Booking và Razor Pages
 
+> Tài liệu nghiệp vụ của Thịnh được giữ theo quyền sở hữu. Hướng dẫn chạy hiện tại
+> nằm trong [README](../README.md); số test/ID/ngày và các mô tả thay đổi bên dưới là lịch sử.
+
 ## Hiện trạng trước thay đổi
 
 `develop` tại `893e751` đã merge PR #2: 11 bảng SQL, ERD, seed, các kiểm tra
@@ -14,9 +17,9 @@ Không tìm thấy AGENTS.md trong workspace/repository. Đã đối chiếu REA
 ## Phần triển khai
 
 - DTO cho Booking, BookingDetail, đầu vào khách đặt/hành khách và dữ liệu tích hợp.
-- `BookingBUS`: kiểm tra dữ liệu, tính lại giá/giảm giá, tìm kiếm nâng cao trên
+- `DatVeBUS`: kiểm tra dữ liệu, tính lại giá/giảm giá, tìm kiếm nâng cao trên
   ArrayList, cấp ghế, điều phối transaction đặt/hủy và kiểm tra quyền tra cứu.
-- `BookingDAO`/`BookingData`: SQL có tham số, quản lý transaction và truy cập
+- `DatVeDAO`/`DuLieuDatVe`: SQL có tham số, quản lý transaction và truy cập
   Booking/BookingDetail cùng dữ liệu cần thiết. Chi tiết Booking được quản lý
   trong cùng aggregate/transaction, không có màn hình sửa độc lập từng chi tiết.
 - `MyConnection`: dùng chung, không lưu mật khẩu trong source. Được tách thành
@@ -193,7 +196,7 @@ Phần này thay thế các giới hạn một chuyến/một Booking của phi�
 
 ### Đã sửa
 
-- `FlightSearch`: loại hành trình và ngày về; một chiều xóa ngày về khỏi xử lý.
+- `DieuKienTimChuyenBay`: loại hành trình và ngày về; một chiều xóa ngày về khỏi xử lý.
 - Trang Index tìm lượt đi, rồi đảo sân bay để tìm lượt về. Chuyến về phải khởi hành
   sau khi chuyến đi hạ cánh, kể cả bay qua đêm; không chỉ so sánh ngày.
 - Checkout giữ đúng Quantity, bind `Input.Passengers[0..n-1]` riêng từng người.
@@ -241,7 +244,7 @@ Không gộp hai chuyến vào BOOKING.flight_id. Mỗi hành trình khứ hồi
   mỗi khóa lại được hash trước khi lưu. Không thêm cột/bảng mới để liên kết hai lượt.
   Dùng mã Booking lượt đi + khóa tra cứu gốc để mở lại toàn hành trình sau restart.
 
-BUS dùng đúng một `BookingDAO.Write`/SqlTransaction Serializable cho cả hai lượt,
+BUS dùng đúng một `DatVeDAO.GhiDuLieu`/SqlTransaction Serializable cho cả hai lượt,
 khóa FLIGHT theo flight_id tăng dần, tính lại giá và kiểm tra ghế cả hai lượt.
 Lỗi ở lượt về rollback luôn dữ liệu lượt đi. Không cộng doanh thu khi hóa đơn UNPAID.
 Mã giảm giá áp dụng trên giá lượt đi, dùng một lượt mã cho cả hành trình; lượt về
@@ -272,7 +275,7 @@ Những người quản lý hóa đơn/thanh toán tiếp tục cần phối h�
   Bộ `--sql` đã bổ sung ca hai Booking/cùng hành khách, retry, hủy hai lượt lặp,
   lỗi lượt về sau khi ghi lượt đi và rollback, nhưng chưa được thực thi.
 
-Các file chính: BookingModels.cs, BookingBUS.cs, BookingDraft.cs, Index.cshtml(.cs),
+Các file chính: BookingModels.cs, DatVeBUS.cs, DatVeTam.cs, Index.cshtml(.cs),
 Checkout.cshtml(.cs), Details.cshtml(.cs), search.js, site.css và tests/FlightBooking.Checks.
 Không làm phần Hiếu, không tự merge PR. Thay đổi có sẵn của người dùng trong
 Database/02_CreateTables.sql được giữ nguyên.
@@ -282,10 +285,10 @@ Database/02_CreateTables.sql được giữ nguyên.
 - Người đặt phải đã qua sinh nhật lần 18 theo ngày Việt Nam; đúng ngày sinh nhật
   thứ 18 vẫn bị từ chối. BUS dùng ngày đầy đủ và xử lý ngày 29/2; form có min/max
   tương ứng và lỗi dưới ô ngày sinh. Không áp tuổi này cho hành khách.
-- CustomerInput bắt buộc CCCD/hộ chiếu riêng, trim, tối đa 50 ký tự, giữ quy tắc
+- ThongTinKhachDat bắt buộc CCCD/hộ chiếu riêng, trim, tối đa 50 ký tự, giữ quy tắc
   chữ Latin/số/dấu gạch ngang. DAO vẫn ghi CUSTOMER.id_passport_number. Không sửa
   schema, dữ liệu cũ hoặc quy tắc đọc các bản ghi cũ.
-- BookingDraft lưu dấu trạng thái mã đã áp theo mã chuẩn hóa, lựa chọn hai lượt,
+- DatVeTam lưu dấu trạng thái mã đã áp theo mã chuẩn hóa, lựa chọn hai lượt,
   số người và báo giá. Mỗi lần xem giá đều đọc và tính lại phía server; áp lại
   cùng mã/cùng giá thông báo “Mã giảm giá này đã được áp dụng”. Đổi/xóa/mã lỗi
   không giữ trạng thái cũ; đổi số vé/chuyến/giá làm trạng thái mất hiệu lực.
@@ -299,7 +302,7 @@ Database/02_CreateTables.sql được giữ nguyên.
   giữ lỗi, giới tính, danh sách người đi và cả hai lượt. Mã lỗi vẫn hiện hành trình
   với giá chưa giảm, không đưa khách về màn hình chọn chuyến.
 
-File chính: BookingModels.cs, BookingBUS.cs, BookingDraft.cs,
+File chính: BookingModels.cs, DatVeBUS.cs, DatVeTam.cs,
 Pages/Booking/Checkout.cshtml và .cshtml.cs, wwwroot/js/checkout.js.
 
 Kiểm tra: build solution ở tmp/contact-build 0 lỗi, 5 cảnh báo NU1900; 82 kiểm tra

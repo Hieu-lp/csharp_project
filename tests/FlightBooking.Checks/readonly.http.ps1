@@ -91,4 +91,35 @@ try {
     $statusWithoutToken = [int]$_.Exception.Response.StatusCode
 }
 Assert ($statusWithoutToken -eq 400) 'POST without antiforgery token is rejected'
+
+# Các nhánh PageModel mới chỉ được thử xem giá/quay lại/tra cứu; không gửi book/cancel.
+$incompleteReturn = GetPage "/Booking/Checkout?flightId=$flightId&fareId=$fareId&quantity=2&tripType=RoundTrip"
+Assert ($incompleteReturn.Contains('Chọn đầy đủ chuyến đi') -and -not $incompleteReturn.Contains('id="checkout-form"')) 'round-trip requires complete return selection'
+$returnDate = (Get-Date).AddYears(1).ToString('yyyy-MM-dd')
+$sameFlightReturn = GetPage "/Booking/Checkout?flightId=$flightId&fareId=$fareId&quantity=2&tripType=RoundTrip&returnDate=$returnDate&returnFlightId=$flightId&returnFareId=$fareId"
+Assert ($sameFlightReturn.Contains('Lượt về phải đảo chiều hành trình')) 'round-trip rejects the outbound flight reused as return'
+$allDeals = [regex]::Matches($homePageHtml, 'name="SelectedDeal"\s+value="([0-9]+):([0-9]+)"')
+if ($allDeals.Count -gt 1) {
+    $otherFare = $allDeals[1].Groups[2].Value
+    $wrongFare = GetPage "/Booking/Checkout?flightId=$flightId&fareId=$otherFare&quantity=2"
+    Assert ($wrongFare.Contains('Hạng vé không thuộc chuyến bay này')) 'checkout rejects fare from another catalog flight'
+} else {
+    'SKIP: another existing deal is required for mismatched-fare HTTP check.'
+}
+$lookupData = Fields $lookup
+$lookupData.BookingId = '2147483647'
+$lookupData.AccessKey = ('A' * 64)
+$lookupError = [Net.WebUtility]::HtmlDecode((Invoke-WebRequest -UseBasicParsing ($BaseUrl + '/Booking/Lookup') -Method Post -Body $lookupData -WebSession $script:webSession).Content)
+Assert ($lookupError.Contains('Database chưa đủ bảng') -or $lookupError.Contains('Mã đơn hoặc khóa tra cứu không đúng')) 'lookup has a readable missing-schema or invalid-key error'
+$unauthorized = GetPage '/Booking/Details/2147483647'
+Assert ($unauthorized.Contains('name="AccessKey"')) 'failed lookup never grants details access'
+
+$backData = Fields $preview
+$draftId = $backData.DraftId
+$backData.action = 'back'
+if ($backData.action -ne 'back') { throw 'Only return-to-search action is allowed here.' }
+$backPage = [Net.WebUtility]::HtmlDecode((Invoke-WebRequest -UseBasicParsing ($BaseUrl + '/Booking/Checkout') -Method Post -Body $backData -WebSession $script:webSession).Content)
+Assert ($backPage.Contains('id="flight-search"') -and (Fields $backPage).DraftId -eq $draftId) 'back-to-search preserves session draft and redirects to search'
+$resume = GetPage ($checkoutPath + '&draftId=' + $draftId)
+Assert ($resume.Contains('Read Only Booker') -and $resume.Contains('Read Only Passenger 1') -and (Fields $resume)['Input.Quantity'] -eq '2') 'resuming a draft retains booker, passengers and quantity'
 "$script:checks read-only HTTP checks passed. No booking or cancellation submitted."

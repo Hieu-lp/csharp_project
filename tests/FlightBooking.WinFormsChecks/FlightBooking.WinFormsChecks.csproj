@@ -8,5 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/FlightBooking.WinForms/FlightBooking.WinForms.csproj" />
+    <Compile Include="../Shared/SqlTestPreflight.cs" Link="SqlTestPreflight.cs" />
+    <None Include="../Shared/SqlTestPreflight.sql" Link="SqlTestPreflight.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

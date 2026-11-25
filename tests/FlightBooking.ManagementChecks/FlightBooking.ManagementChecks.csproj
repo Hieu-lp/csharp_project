@@ -4,7 +4,10 @@
     <ProjectReference Include="../../src/FlightBooking.BUS/FlightBooking.BUS.csproj" />
     <ProjectReference Include="../../src/FlightBooking.DAO/FlightBooking.DAO.csproj" />
     <ProjectReference Include="../../src/FlightBooking.DTO/FlightBooking.DTO.csproj" />
-    <Compile Include="../../src/FlightBooking.WinForms/EditorSession.cs" Link="EditorSession.cs" />
+    <Compile Include="../../src/FlightBooking.WinForms/PhienChinhSua.cs" Link="PhienChinhSua.cs" />
+    <Compile Include="../Shared/SqlTestPreflight.cs" Link="SqlTestPreflight.cs" />
+    <Compile Include="../Shared/SqlTestPolicyChecks.cs" Link="SqlTestPolicyChecks.cs" />
+    <None Include="../Shared/SqlTestPreflight.sql" Link="SqlTestPreflight.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>
