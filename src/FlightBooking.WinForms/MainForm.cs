@@ -106,8 +106,9 @@ public sealed class MainForm : Form
         {
             LoaiDanhMuc.SanBay => "Sân bay", LoaiDanhMuc.ChuyenBay => "Chuyến bay", _ => "Hạng vé"
         });
-        HienThiModule(manHinh);
+        // Chọn tab khi form chưa hiện để việc tải tab đầu không chặn điều hướng.
         manHinh.ChonTrang(loai);
+        HienThiModule(manHinh);
         DanhDauMuc(ten);
     }
 

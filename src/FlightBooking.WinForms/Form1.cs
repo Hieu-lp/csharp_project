@@ -43,7 +43,7 @@ public partial class Form1 : Form
         Shown += async (_, _) =>
         {
             if (TopLevel) Bounds = GiaoDien.KichThuocCuaSo(Screen.FromControl(this).WorkingArea, new Size(1340, 840));
-            await sanBay.DamBaoDaTai();
+            await danhSachTrang[cacThe.SelectedIndex].DamBaoDaTai();
         };
     }
 
