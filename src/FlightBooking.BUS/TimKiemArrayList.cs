@@ -8,10 +8,7 @@ namespace FlightBooking.BUS;
 // Các điều kiện được nối lần lượt từ trái sang phải; NOT nghĩa là AND NOT điều kiện hiện tại.
 public static class TimKiemArrayList
 {
-    public static ArrayList LocDanhSach<T>(
-        IEnumerable<T> danhSach,
-        ArrayList cacDieuKien,
-        Func<T, string, object?> layGiaTriTruong)
+    public static ArrayList LocDanhSach(IEnumerable danhSach, ArrayList cacDieuKien)
     {
         ArgumentNullException.ThrowIfNull(danhSach);
         ArgumentNullException.ThrowIfNull(cacDieuKien);
@@ -26,14 +23,14 @@ public static class TimKiemArrayList
         }
 
         var ketQua = new ArrayList();
-        foreach (T dong in danhSach)
+        foreach (object dong in danhSach)
         {
             bool khopDong = true;
             bool laDieuKienDau = true;
 
             foreach (DieuKienTimKiemDTO dieuKien in dieuKienDaDoc)
             {
-                object? giaTriThuc = layGiaTriTruong(dong, dieuKien.Truong);
+                object? giaTriThuc = LayGiaTriTruong(dong, dieuKien.Truong);
                 bool khopDieuKien = SoSanh(giaTriThuc, dieuKien.PhepSoSanh, dieuKien.GiaTri);
 
                 if (laDieuKienDau)
@@ -43,13 +40,15 @@ public static class TimKiemArrayList
                 }
                 else
                 {
-                    khopDong = dieuKien.PhepNoi.ToUpperInvariant() switch
-                    {
-                        "AND" => khopDong && khopDieuKien,
-                        "OR" => khopDong || khopDieuKien,
-                        "NOT" => khopDong && !khopDieuKien,
-                        _ => throw new ArgumentException("Toán tử nối chỉ nhận AND, OR hoặc NOT.", nameof(cacDieuKien))
-                    };
+                    string phepNoi = dieuKien.PhepNoi.ToUpperInvariant();
+                    if (phepNoi == "AND")
+                        khopDong = khopDong && khopDieuKien;
+                    else if (phepNoi == "OR")
+                        khopDong = khopDong || khopDieuKien;
+                    else if (phepNoi == "NOT")
+                        khopDong = khopDong && !khopDieuKien;
+                    else
+                        throw new ArgumentException("Toán tử nối chỉ nhận AND, OR hoặc NOT.", nameof(cacDieuKien));
                 }
             }
 
@@ -58,6 +57,113 @@ public static class TimKiemArrayList
         }
 
         return ketQua;
+    }
+
+    // Chỉ đọc thuộc tính DTO của ba module Phú; không dùng reflection và không truy cập SQL.
+    private static object? LayGiaTriTruong(object dong, string truong)
+    {
+        string tenTruong = truong.Trim().Replace("_", string.Empty).ToUpperInvariant();
+        if (dong is KhachHangDTO khachHang)
+        {
+            switch (tenTruong)
+            {
+                case "CUSTOMERID":
+                case "MAKHACHHANG":
+                    return khachHang.MaKhachHang;
+                case "FULLNAME":
+                case "HOTEN":
+                    return khachHang.HoTen;
+                case "PHONE":
+                case "DIENTHOAI":
+                    return khachHang.DienThoai;
+                case "EMAIL":
+                    return khachHang.Email;
+                case "DATEOFBIRTH":
+                case "NGAYSINH":
+                    return khachHang.NgaySinh;
+                case "GENDER":
+                case "GIOITINH":
+                    return khachHang.GioiTinh;
+                case "IDPASSPORTNUMBER":
+                case "SOGIAYTO":
+                    return khachHang.SoGiayTo;
+                default:
+                    throw new ArgumentException($"Không có trường CUSTOMER tên '{truong}'.", nameof(truong));
+            }
+        }
+        if (dong is NhanVienDTO nhanVien)
+        {
+            switch (tenTruong)
+            {
+                case "EMPLOYEEID":
+                case "MANHANVIEN":
+                    return nhanVien.MaNhanVien;
+                case "FULLNAME":
+                case "HOTEN":
+                    return nhanVien.HoTen;
+                case "PHONE":
+                case "DIENTHOAI":
+                    return nhanVien.DienThoai;
+                case "EMAIL":
+                    return nhanVien.Email;
+                case "POSITION":
+                case "CHUCVU":
+                    return nhanVien.ChucVu;
+                case "HIREDATE":
+                case "NGAYVAOLAM":
+                    return nhanVien.NgayVaoLam;
+                case "STATUS":
+                case "TRANGTHAI":
+                    return nhanVien.TrangThai;
+                default:
+                    throw new ArgumentException($"Không có trường EMPLOYEE tên '{truong}'.", nameof(truong));
+            }
+        }
+        if (dong is MaGiamGiaQuanLyDTO maGiamGia)
+        {
+            switch (tenTruong)
+            {
+                case "DISCOUNTID":
+                case "MAGIAMGIA":
+                    return maGiamGia.MaGiamGia;
+                case "CODE":
+                case "MA":
+                    return maGiamGia.Ma;
+                case "DESCRIPTION":
+                case "MOTA":
+                    return maGiamGia.MoTa;
+                case "DISCOUNTTYPE":
+                case "LOAIGIAM":
+                    return maGiamGia.LoaiGiam;
+                case "DISCOUNTVALUE":
+                case "GIATRIGIAM":
+                    return maGiamGia.GiaTriGiam;
+                case "MINORDERAMOUNT":
+                case "DONTOITHIEU":
+                    return maGiamGia.DonToiThieu;
+                case "MAXDISCOUNTAMOUNT":
+                case "GIAMTOIDA":
+                    return maGiamGia.GiamToiDa;
+                case "STARTDATE":
+                case "NGAYBATDAU":
+                    return maGiamGia.NgayBatDau;
+                case "ENDDATE":
+                case "NGAYKETTHUC":
+                    return maGiamGia.NgayKetThuc;
+                case "USAGELIMIT":
+                case "GIOIHANLUOTDUNG":
+                    return maGiamGia.GioiHanLuotDung;
+                case "USEDCOUNT":
+                case "SOLUOTDADUNG":
+                    return maGiamGia.SoLuotDaDung;
+                case "STATUS":
+                case "TRANGTHAI":
+                    return maGiamGia.TrangThai;
+                default:
+                    throw new ArgumentException($"Không có trường DISCOUNT_CODE tên '{truong}'.", nameof(truong));
+            }
+        }
+        throw new ArgumentException("Bộ lọc chỉ nhận DTO khách hàng, nhân viên hoặc mã giảm giá.", nameof(dong));
     }
 
     private static void KiemTraDieuKien(DieuKienTimKiemDTO dieuKien)

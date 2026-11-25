@@ -10,7 +10,7 @@ public class KhachHangDAO
     private const string CacCot = "customer_id, full_name, phone, email, date_of_birth, gender, id_passport_number";
 
     // Đọc nhiều khách hàng; mỗi dòng SQL trở thành một DTO trong List.
-    public List<KhachHangDTO> DocDanhSach()
+    public List<KhachHangDTO> DocDSKhachHang()
     {
         const string cauSQL = $"SELECT {CacCot} FROM dbo.CUSTOMER ORDER BY customer_id;";
         var danhSachKhachHang = new List<KhachHangDTO>();//tạo 1 danh sách rỗng để chứa các khách hàng tìm được
@@ -28,7 +28,7 @@ public class KhachHangDAO
     }
 
     // Đọc một khách hàng theo khóa chính; trả null nếu ID không tồn tại.
-    public KhachHangDTO? DocTheoMa(int maKhachHang)
+    public KhachHangDTO? DocKhachHangTheoMa(int maKhachHang)
     {
         string cauSQL = $"SELECT {CacCot} FROM dbo.CUSTOMER WHERE customer_id = @CustomerId;";
         using SqlConnection ketNoi = MyConnection.CreateConnection();
@@ -63,7 +63,7 @@ public class KhachHangDAO
     }
 
     // Thêm khách hàng; customer_id được DB tự sinh nên không nằm trong INSERT.
-    public bool Them(KhachHangDTO khachHang)
+    public bool ThemKhachHang(KhachHangDTO khachHang)
     {
         const string cauSQL = """
             INSERT INTO dbo.CUSTOMER(full_name, phone, email, date_of_birth, gender, id_passport_number)
@@ -77,7 +77,7 @@ public class KhachHangDAO
     }
 
     // Cập nhật các trường được phép sửa, xác định dòng bằng ID.
-    public bool Sua(KhachHangDTO khachHang)
+    public bool SuaKhachHang(KhachHangDTO khachHang)
     {
         const string cauSQL = """
             UPDATE dbo.CUSTOMER
@@ -95,7 +95,7 @@ public class KhachHangDAO
     }
 
     // Xóa một dòng; DB có thể từ chối nếu booking đang tham chiếu khách hàng.
-    public bool Xoa(int maKhachHang)
+    public bool XoaKhachHang(int maKhachHang)
     {
         const string cauSQL = "DELETE FROM dbo.CUSTOMER WHERE customer_id = @CustomerId;";
         using SqlConnection ketNoi = MyConnection.CreateConnection();

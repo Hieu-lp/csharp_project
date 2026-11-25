@@ -25,7 +25,7 @@ internal static class ArrayListSearchChecks
                 PhepNoi = "AND"
             }
         };
-        ArrayList nameResults = TimKiemArrayList.LocDanhSach(customers, containsName, GetCustomerField);
+        ArrayList nameResults = TimKiemArrayList.LocDanhSach(customers, containsName);
         CheckAssert.True(nameResults.Count == 2, "ArrayList search matches text without case sensitivity");
 
         var combinedConditions = new ArrayList
@@ -45,17 +45,9 @@ internal static class ArrayListSearchChecks
                 PhepNoi = "AND"
             }
         };
-        ArrayList combinedResults = TimKiemArrayList.LocDanhSach(customers, combinedConditions, GetCustomerField);
+        ArrayList combinedResults = TimKiemArrayList.LocDanhSach(customers, combinedConditions);
         CheckAssert.True(combinedResults.Count == 1 && ((KhachHangDTO)combinedResults[0]!).MaKhachHang == 3,
             "ArrayList search combines numeric and text conditions");
     }
 
-    private static object? GetCustomerField(KhachHangDTO customer, string field) =>
-        field.Trim().Replace("_", string.Empty).ToUpperInvariant() switch
-        {
-            "CUSTOMERID" => customer.MaKhachHang,
-            "FULLNAME" => customer.HoTen,
-            "PHONE" => customer.DienThoai,
-            _ => throw new ArgumentException($"Unknown test field '{field}'.", nameof(field))
-        };
 }

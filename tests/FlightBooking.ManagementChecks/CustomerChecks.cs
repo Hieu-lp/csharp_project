@@ -11,19 +11,19 @@ internal static class CustomerChecks
 
         KhachHangDTO missingName = ValidCustomer();
         missingName.HoTen = "   ";
-        CheckAssert.ErrorContains(bus.Them(missingName), "Họ tên", "Customer rejects a blank name before database access");
+        CheckAssert.ErrorContains(bus.ThemKhachHang(missingName), "Họ tên", "Customer rejects a blank name before database access");
 
         KhachHangDTO badEmail = ValidCustomer();
         badEmail.Email = "not-an-email";
-        CheckAssert.ErrorContains(bus.Them(badEmail), "Email", "Customer rejects an invalid email before database access");
+        CheckAssert.ErrorContains(bus.ThemKhachHang(badEmail), "Email", "Customer rejects an invalid email before database access");
 
         KhachHangDTO futureBirthDate = ValidCustomer();
         futureBirthDate.NgaySinh = DateTime.Today.AddDays(1);
-        CheckAssert.ErrorContains(bus.Them(futureBirthDate), "Ngày sinh", "Customer rejects a future birth date before database access");
+        CheckAssert.ErrorContains(bus.ThemKhachHang(futureBirthDate), "Ngày sinh", "Customer rejects a future birth date before database access");
 
         KhachHangDTO invalidGender = ValidCustomer();
         invalidGender.GioiTinh = "Other";
-        CheckAssert.ErrorContains(bus.Them(invalidGender), "Giới tính", "Customer rejects an unsupported gender before database access");
+        CheckAssert.ErrorContains(bus.ThemKhachHang(invalidGender), "Giới tính", "Customer rejects an unsupported gender before database access");
     }
 
     private static KhachHangDTO ValidCustomer() => new()

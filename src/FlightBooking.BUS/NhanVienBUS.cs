@@ -10,46 +10,70 @@ public class NhanVienBUS
 {
     private readonly NhanVienDAO dao = new();
 
-    public List<NhanVienDTO> DocDanhSach() => dao.DocDanhSach();
-
-    public NhanVienDTO? DocTheoMa(int maNhanVien) =>
-        maNhanVien > 0 ? dao.DocTheoMa(maNhanVien) : null;
-
-    public string? Them(NhanVienDTO nhanVien)
+    public ArrayList DocDSNhanVien()
     {
-        ChuanHoa(nhanVien);
-        string? loi = KiemTraDuLieu(nhanVien);
+        ArrayList danhSach = new ArrayList();
+        foreach (NhanVienDTO nhanVien in dao.DocDSNhanVien())
+        {
+            danhSach.Add(nhanVien);
+        }
+        return danhSach;
+    }
+
+    public NhanVienDTO? DocNhanVienTheoMa(int maNhanVien)
+    {
+        if (maNhanVien <= 0) return null;
+        return dao.DocNhanVienTheoMa(maNhanVien);
+    }
+
+    public string? ThemNhanVien(NhanVienDTO nhanVien)
+    {
+        ChuanHoaNhanVien(nhanVien);
+        string? loi = KiemTraNhanVien(nhanVien);
         if (loi is not null) return loi;
 
         if (dao.TrungDienThoai(nhanVien.DienThoai)) return "Số điện thoại đã được sử dụng.";
         if (dao.TrungEmail(nhanVien.Email)) return "Email đã được sử dụng.";
-        return dao.Them(nhanVien) ? null : "Không thêm được nhân viên.";
+        if (!dao.ThemNhanVien(nhanVien))
+        {
+            return "Không thêm được nhân viên.";
+        }
+        return null;
     }
 
-    public string? Sua(NhanVienDTO nhanVien)
+    public string? SuaNhanVien(NhanVienDTO nhanVien)
     {
         if (nhanVien.MaNhanVien <= 0) return "Mã nhân viên không hợp lệ.";
-        ChuanHoa(nhanVien);
-        string? loi = KiemTraDuLieu(nhanVien);
+        ChuanHoaNhanVien(nhanVien);
+        string? loi = KiemTraNhanVien(nhanVien);
         if (loi is not null) return loi;
 
         if (dao.TrungDienThoai(nhanVien.DienThoai, nhanVien.MaNhanVien)) return "Số điện thoại đã được nhân viên khác sử dụng.";
         if (dao.TrungEmail(nhanVien.Email, nhanVien.MaNhanVien)) return "Email đã được nhân viên khác sử dụng.";
-        return dao.Sua(nhanVien) ? null : "Không tìm thấy nhân viên để cập nhật.";
+        if (!dao.SuaNhanVien(nhanVien))
+        {
+            return "Không tìm thấy nhân viên để cập nhật.";
+        }
+        return null;
     }
 
-    public string? Xoa(int maNhanVien)
+    public string? XoaNhanVien(int maNhanVien)
     {
         if (maNhanVien <= 0) return "Mã nhân viên không hợp lệ.";
-        return dao.Xoa(maNhanVien) ? null : "Không tìm thấy nhân viên để xóa.";
+        if (!dao.XoaNhanVien(maNhanVien))
+        {
+            return "Không tìm thấy nhân viên để xóa.";
+        }
+        return null;
     }
 
-    public ArrayList TimKiem(string? tuKhoa)
+    public ArrayList TimKiemNhanVien(string? tuKhoa)
     {
         string chuoiTim = tuKhoa?.Trim() ?? string.Empty;
         var ketQua = new ArrayList();
 
-        foreach (NhanVienDTO nhanVien in dao.DocDanhSach())
+        ArrayList danhSach = DocDSNhanVien();
+        foreach (NhanVienDTO nhanVien in danhSach)
         {
             bool khop = chuoiTim.Length == 0 ||
                 ChuaChuoi(nhanVien.MaNhanVien.ToString(), chuoiTim) ||
@@ -67,23 +91,14 @@ public class NhanVienBUS
     }
 
     // Tìm kiếm nhiều trường/điều kiện; lọc trong BUS bằng ArrayList.
-    public ArrayList TimKiemNangCao(ArrayList cacDieuKien) =>
-        TimKiemArrayList.LocDanhSach(dao.DocDanhSach(), cacDieuKien, LayGiaTriTruong);
+    public ArrayList TimKiemNhanVienNangCao(ArrayList cacDieuKien)
+    {
+        ArrayList danhSach = DocDSNhanVien();
+        return TimKiemArrayList.LocDanhSach(danhSach, cacDieuKien);
+    }
 
-    private static object? LayGiaTriTruong(NhanVienDTO nhanVien, string truong) =>
-        truong.Trim().Replace("_", string.Empty).ToUpperInvariant() switch
-        {
-            "EMPLOYEEID" or "MANHANVIEN" => nhanVien.MaNhanVien,
-            "FULLNAME" or "HOTEN" => nhanVien.HoTen,
-            "PHONE" or "DIENTHOAI" => nhanVien.DienThoai,
-            "EMAIL" => nhanVien.Email,
-            "POSITION" or "CHUCVU" => nhanVien.ChucVu,
-            "HIREDATE" or "NGAYVAOLAM" => nhanVien.NgayVaoLam,
-            "STATUS" or "TRANGTHAI" => nhanVien.TrangThai,
-            _ => throw new ArgumentException($"Không có trường EMPLOYEE tên '{truong}'.", nameof(truong))
-        };
 
-    private static string? KiemTraDuLieu(NhanVienDTO nhanVien)
+    private static string? KiemTraNhanVien(NhanVienDTO nhanVien)
     {
         if (string.IsNullOrWhiteSpace(nhanVien.HoTen)) return "Họ tên không được để trống.";
         if (nhanVien.HoTen.Length > 100) return "Họ tên không được dài quá 100 ký tự.";
@@ -98,7 +113,7 @@ public class NhanVienBUS
         return null;
     }
 
-    private static void ChuanHoa(NhanVienDTO nhanVien)
+    private static void ChuanHoaNhanVien(NhanVienDTO nhanVien)
     {
         nhanVien.HoTen = nhanVien.HoTen.Trim();
         nhanVien.DienThoai = nhanVien.DienThoai.Trim();

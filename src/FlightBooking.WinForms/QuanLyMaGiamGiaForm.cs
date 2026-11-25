@@ -1,3 +1,4 @@
+using System.Collections;
 using FlightBooking.BUS;
 using FlightBooking.DTO;
 using Microsoft.Data.SqlClient;
@@ -171,9 +172,9 @@ public sealed class QuanLyMaGiamGiaForm : Form
             WrapContents = true,
             Margin = new Padding(0, 0, 0, 8)
         };
-        vung.Controls.Add(TaoNut("Thêm", (_, _) => ThemBanGhi()));
-        vung.Controls.Add(TaoNut("Cập nhật", (_, _) => SuaBanGhi()));
-        vung.Controls.Add(TaoNut("Xóa", (_, _) => XoaBanGhi()));
+        vung.Controls.Add(TaoNut("Thêm", ThemMaGiamGia_Click));
+        vung.Controls.Add(TaoNut("Cập nhật", SuaMaGiamGia_Click));
+        vung.Controls.Add(TaoNut("Xóa", XoaMaGiamGia_Click));
         vung.Controls.Add(TaoNut("Làm trống form", (_, _) => XoaDuLieuNhap()));
         return vung;
     }
@@ -216,7 +217,7 @@ public sealed class QuanLyMaGiamGiaForm : Form
         if (!CoTheRoiTrang()) return;
         try
         {
-            HienThiDanhSach(bus.DocDanhSach());
+            HienThiDanhSach(bus.DocDSMaGiamGia());
             thongBao.Text = $"Đang hiển thị {danhSach.Items.Count} mã giảm giá.";
         }
         catch (Exception loiGoc) { HienThiLoiDuLieu(loiGoc); }
@@ -227,18 +228,19 @@ public sealed class QuanLyMaGiamGiaForm : Form
         if (!CoTheRoiTrang()) return;
         try
         {
-            var ketQua = bus.TimKiem(oTimKiem.Text).Cast<MaGiamGiaQuanLyDTO>().ToList();
+            ArrayList ketQua = bus.TimKiemMaGiamGia(oTimKiem.Text);
             HienThiDanhSach(ketQua);
             thongBao.Text = $"Tìm thấy {ketQua.Count} mã giảm giá.";
         }
         catch (Exception loiGoc) { HienThiLoiDuLieu(loiGoc); }
     }
 
-    private void ThemBanGhi()
+    private void ThemMaGiamGia_Click(object? nguoiGui, EventArgs suKien)
     {
         try
         {
-            string? loi = bus.Them(DocDuLieuNhap());
+            MaGiamGiaQuanLyDTO maGiamGia = DocDuLieuNhap();
+            string? loi = bus.ThemMaGiamGia(maGiamGia);
             if (HienThiLoiNghiepVu(loi)) return;
             duLieuBanDau = ChupDuLieu();
             TaiDanhSach();
@@ -248,7 +250,7 @@ public sealed class QuanLyMaGiamGiaForm : Form
         catch (Exception loiGoc) { HienThiLoiDuLieu(loiGoc); }
     }
 
-    private void SuaBanGhi()
+    private void SuaMaGiamGia_Click(object? nguoiGui, EventArgs suKien)
     {
         if (!DocMaDaChon(out int ma))
         {
@@ -260,7 +262,7 @@ public sealed class QuanLyMaGiamGiaForm : Form
         {
             MaGiamGiaQuanLyDTO maGiamGia = DocDuLieuNhap();
             maGiamGia.MaGiamGia = ma;
-            string? loi = bus.Sua(maGiamGia);
+            string? loi = bus.SuaMaGiamGia(maGiamGia);
             if (HienThiLoiNghiepVu(loi)) return;
             duLieuBanDau = ChupDuLieu();
             TaiDanhSach();
@@ -270,7 +272,7 @@ public sealed class QuanLyMaGiamGiaForm : Form
         catch (Exception loiGoc) { HienThiLoiDuLieu(loiGoc); }
     }
 
-    private void XoaBanGhi()
+    private void XoaMaGiamGia_Click(object? nguoiGui, EventArgs suKien)
     {
         if (!DocMaDaChon(out int ma))
         {
@@ -282,7 +284,7 @@ public sealed class QuanLyMaGiamGiaForm : Form
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         try
         {
-            string? loi = bus.Xoa(ma);
+            string? loi = bus.XoaMaGiamGia(ma);
             if (HienThiLoiNghiepVu(loi)) return;
             duLieuBanDau = ChupDuLieu();
             TaiDanhSach();
@@ -346,7 +348,10 @@ public sealed class QuanLyMaGiamGiaForm : Form
     {
         if (xacNhan && !CoTheRoiTrang()) return;
         dangGanDuLieu = true;
-        foreach (ListViewItem dong in danhSach.SelectedItems.Cast<ListViewItem>().ToArray()) dong.Selected = false;
+        while (danhSach.SelectedItems.Count > 0)
+        {
+            danhSach.SelectedItems[0].Selected = false;
+        }
         dongDangChon = null;
         dangGanDuLieu = false;
         oMa.Clear();
@@ -445,7 +450,7 @@ public sealed class QuanLyMaGiamGiaForm : Form
         return nut;
     }
 
-    private void HienThiDanhSach(IEnumerable<MaGiamGiaQuanLyDTO> nguon)
+    private void HienThiDanhSach(IEnumerable nguon)
     {
         dangGanDuLieu = true;
         danhSach.BeginUpdate();
@@ -455,8 +460,20 @@ public sealed class QuanLyMaGiamGiaForm : Form
             dongDangChon = null;
             foreach (MaGiamGiaQuanLyDTO maGiamGia in nguon)
             {
-                string[] cacO = [maGiamGia.MaGiamGia.ToString(), maGiamGia.Ma, maGiamGia.MoTa, maGiamGia.LoaiGiam, maGiamGia.GiaTriGiam.ToString("N2"), maGiamGia.DonToiThieu.ToString("N2"), maGiamGia.GiamToiDa?.ToString("N2") ?? "Không giới hạn", maGiamGia.NgayBatDau.ToString("dd/MM/yyyy HH:mm"), maGiamGia.NgayKetThuc.ToString("dd/MM/yyyy HH:mm"), maGiamGia.GioiHanLuotDung?.ToString() ?? "Không giới hạn", maGiamGia.SoLuotDaDung.ToString(), maGiamGia.TrangThai == "ACTIVE" ? "Đang áp dụng" : "Ngừng áp dụng"];
-                danhSach.Items.Add(new ListViewItem(cacO) { Tag = maGiamGia });
+                ListViewItem dong = new ListViewItem(maGiamGia.MaGiamGia.ToString());
+                dong.SubItems.Add(maGiamGia.Ma);
+                dong.SubItems.Add(maGiamGia.MoTa);
+                dong.SubItems.Add(maGiamGia.LoaiGiam);
+                dong.SubItems.Add(maGiamGia.GiaTriGiam.ToString("N2"));
+                dong.SubItems.Add(maGiamGia.DonToiThieu.ToString("N2"));
+                dong.SubItems.Add(maGiamGia.GiamToiDa?.ToString("N2") ?? "Không giới hạn");
+                dong.SubItems.Add(maGiamGia.NgayBatDau.ToString("dd/MM/yyyy HH:mm"));
+                dong.SubItems.Add(maGiamGia.NgayKetThuc.ToString("dd/MM/yyyy HH:mm"));
+                dong.SubItems.Add(maGiamGia.GioiHanLuotDung?.ToString() ?? "Không giới hạn");
+                dong.SubItems.Add(maGiamGia.SoLuotDaDung.ToString());
+                dong.SubItems.Add(maGiamGia.TrangThai == "ACTIVE" ? "Đang áp dụng" : "Ngừng áp dụng");
+                dong.Tag = maGiamGia;
+                danhSach.Items.Add(dong);
             }
         }
         finally

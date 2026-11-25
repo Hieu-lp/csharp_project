@@ -11,20 +11,20 @@ internal static class DiscountCodeChecks
 
         MaGiamGiaQuanLyDTO overOneHundredPercent = ValidDiscount();
         overOneHundredPercent.GiaTriGiam = 100.01m;
-        CheckAssert.ErrorContains(bus.Them(overOneHundredPercent), "100", "Discount rejects a percent above 100 before database access");
+        CheckAssert.ErrorContains(bus.ThemMaGiamGia(overOneHundredPercent), "100", "Discount rejects a percent above 100 before database access");
 
         MaGiamGiaQuanLyDTO reversedPeriod = ValidDiscount();
         reversedPeriod.NgayBatDau = new DateTime(2026, 12, 10);
         reversedPeriod.NgayKetThuc = new DateTime(2026, 12, 9);
-        CheckAssert.ErrorContains(bus.Them(reversedPeriod), "Ngày kết thúc", "Discount rejects an end date before start date");
+        CheckAssert.ErrorContains(bus.ThemMaGiamGia(reversedPeriod), "Ngày kết thúc", "Discount rejects an end date before start date");
 
         MaGiamGiaQuanLyDTO negativeUsageLimit = ValidDiscount();
         negativeUsageLimit.GioiHanLuotDung = -1;
-        CheckAssert.ErrorContains(bus.Them(negativeUsageLimit), "Giới hạn lượt", "Discount rejects a negative usage limit");
+        CheckAssert.ErrorContains(bus.ThemMaGiamGia(negativeUsageLimit), "Giới hạn lượt", "Discount rejects a negative usage limit");
 
         MaGiamGiaQuanLyDTO unsupportedType = ValidDiscount();
         unsupportedType.LoaiGiam = "BOGO";
-        CheckAssert.ErrorContains(bus.Them(unsupportedType), "PERCENT", "Discount rejects an unsupported discount type");
+        CheckAssert.ErrorContains(bus.ThemMaGiamGia(unsupportedType), "PERCENT", "Discount rejects an unsupported discount type");
     }
 
     private static MaGiamGiaQuanLyDTO ValidDiscount() => new()

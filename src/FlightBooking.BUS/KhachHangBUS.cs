@@ -10,15 +10,26 @@ public class KhachHangBUS
 {
     private readonly KhachHangDAO dao = new();
 
-    public List<KhachHangDTO> DocDanhSach() => dao.DocDanhSach();
-
-    public KhachHangDTO? DocTheoMa(int maKhachHang) =>
-        maKhachHang > 0 ? dao.DocTheoMa(maKhachHang) : null;
-
-    public string? Them(KhachHangDTO khachHang)
+    public ArrayList DocDSKhachHang()
     {
-        ChuanHoa(khachHang);
-        string? loi = KiemTraDuLieu(khachHang);
+        ArrayList danhSach = new ArrayList();
+        foreach (KhachHangDTO khachHang in dao.DocDSKhachHang())
+        {
+            danhSach.Add(khachHang);
+        }
+        return danhSach;
+    }
+
+    public KhachHangDTO? DocKhachHangTheoMa(int maKhachHang)
+    {
+        if (maKhachHang <= 0) return null;
+        return dao.DocKhachHangTheoMa(maKhachHang);
+    }
+
+    public string? ThemKhachHang(KhachHangDTO khachHang)
+    {
+        ChuanHoaKhachHang(khachHang);
+        string? loi = KiemTraKhachHang(khachHang);
         if (loi is not null) return loi;
 
         if (dao.TrungDienThoai(khachHang.DienThoai)) return "Số điện thoại đã được sử dụng.";
@@ -26,14 +37,18 @@ public class KhachHangBUS
         if (khachHang.SoGiayTo is not null && dao.TrungGiayTo(khachHang.SoGiayTo))
             return "Số giấy tờ tùy thân đã được sử dụng.";
 
-        return dao.Them(khachHang) ? null : "Không thêm được khách hàng.";
+        if (!dao.ThemKhachHang(khachHang))
+        {
+            return "Không thêm được khách hàng.";
+        }
+        return null;
     }
 
-    public string? Sua(KhachHangDTO khachHang)
+    public string? SuaKhachHang(KhachHangDTO khachHang)
     {
         if (khachHang.MaKhachHang <= 0) return "Mã khách hàng không hợp lệ.";
-        ChuanHoa(khachHang);
-        string? loi = KiemTraDuLieu(khachHang);
+        ChuanHoaKhachHang(khachHang);
+        string? loi = KiemTraKhachHang(khachHang);
         if (loi is not null) return loi;
 
         if (dao.TrungDienThoai(khachHang.DienThoai, khachHang.MaKhachHang)) return "Số điện thoại đã được khách hàng khác sử dụng.";
@@ -42,23 +57,32 @@ public class KhachHangBUS
             dao.TrungGiayTo(khachHang.SoGiayTo, khachHang.MaKhachHang))
             return "Số giấy tờ tùy thân đã được khách hàng khác sử dụng.";
 
-        return dao.Sua(khachHang) ? null : "Không tìm thấy khách hàng để cập nhật.";
+        if (!dao.SuaKhachHang(khachHang))
+        {
+            return "Không tìm thấy khách hàng để cập nhật.";
+        }
+        return null;
     }
 
     // null nghĩa là xóa thành công; khóa ngoại có thể làm DAO ném SqlException.
-    public string? Xoa(int maKhachHang)
+    public string? XoaKhachHang(int maKhachHang)
     {
         if (maKhachHang <= 0) return "Mã khách hàng không hợp lệ.";
-        return dao.Xoa(maKhachHang) ? null : "Không tìm thấy khách hàng để xóa.";
+        if (!dao.XoaKhachHang(maKhachHang))
+        {
+            return "Không tìm thấy khách hàng để xóa.";
+        }
+        return null;
     }
 
     // Tìm gần đúng trong BUS; kết quả dùng ArrayList theo yêu cầu môn học.
-    public ArrayList TimKiem(string? tuKhoa)
+    public ArrayList TimKiemKhachHang(string? tuKhoa)
     {
         string chuoiTim = tuKhoa?.Trim() ?? string.Empty;
         var ketQua = new ArrayList();
 
-        foreach (KhachHangDTO khachHang in dao.DocDanhSach())
+        ArrayList danhSach = DocDSKhachHang();
+        foreach (KhachHangDTO khachHang in danhSach)
         {
             bool khop = chuoiTim.Length == 0 ||
                 ChuaChuoi(khachHang.MaKhachHang.ToString(), chuoiTim) ||
@@ -76,23 +100,14 @@ public class KhachHangBUS
     }
 
     // Tìm kiếm nhiều trường/điều kiện; lọc trong BUS bằng ArrayList.
-    public ArrayList TimKiemNangCao(ArrayList cacDieuKien) =>
-        TimKiemArrayList.LocDanhSach(dao.DocDanhSach(), cacDieuKien, LayGiaTriTruong);
+    public ArrayList TimKiemKhachHangNangCao(ArrayList cacDieuKien)
+    {
+        ArrayList danhSach = DocDSKhachHang();
+        return TimKiemArrayList.LocDanhSach(danhSach, cacDieuKien);
+    }
 
-    private static object? LayGiaTriTruong(KhachHangDTO khachHang, string truong) =>
-        truong.Trim().Replace("_", string.Empty).ToUpperInvariant() switch
-        {
-            "CUSTOMERID" or "MAKHACHHANG" => khachHang.MaKhachHang,
-            "FULLNAME" or "HOTEN" => khachHang.HoTen,
-            "PHONE" or "DIENTHOAI" => khachHang.DienThoai,
-            "EMAIL" => khachHang.Email,
-            "DATEOFBIRTH" or "NGAYSINH" => khachHang.NgaySinh,
-            "GENDER" or "GIOITINH" => khachHang.GioiTinh,
-            "IDPASSPORTNUMBER" or "SOGIAYTO" => khachHang.SoGiayTo,
-            _ => throw new ArgumentException($"Không có trường CUSTOMER tên '{truong}'.", nameof(truong))
-        };
 
-    private static string? KiemTraDuLieu(KhachHangDTO khachHang)
+    private static string? KiemTraKhachHang(KhachHangDTO khachHang)
     {
         if (string.IsNullOrWhiteSpace(khachHang.HoTen)) return "Họ tên không được để trống.";
         if (khachHang.HoTen.Length > 100) return "Họ tên không được dài quá 100 ký tự.";
@@ -108,7 +123,7 @@ public class KhachHangBUS
         return null;
     }
 
-    private static void ChuanHoa(KhachHangDTO khachHang)
+    private static void ChuanHoaKhachHang(KhachHangDTO khachHang)
     {
         khachHang.HoTen = khachHang.HoTen.Trim();
         khachHang.DienThoai = khachHang.DienThoai.Trim();

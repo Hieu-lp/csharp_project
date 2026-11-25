@@ -9,52 +9,76 @@ public class MaGiamGiaBUS
 {
     private readonly MaGiamGiaDAO dao = new();
 
-    public List<MaGiamGiaQuanLyDTO> DocDanhSach() => dao.DocDanhSach();
-
-    public MaGiamGiaQuanLyDTO? DocTheoMa(int maGiamGia) =>
-        maGiamGia > 0 ? dao.DocTheoMa(maGiamGia) : null;
-
-    public string? Them(MaGiamGiaQuanLyDTO maGiamGia)
+    public ArrayList DocDSMaGiamGia()
     {
-        ChuanHoa(maGiamGia);
-        string? loi = KiemTraDuLieu(maGiamGia, soLuotDaDung: 0);
+        ArrayList danhSach = new ArrayList();
+        foreach (MaGiamGiaQuanLyDTO maGiamGia in dao.DocDSMaGiamGia())
+        {
+            danhSach.Add(maGiamGia);
+        }
+        return danhSach;
+    }
+
+    public MaGiamGiaQuanLyDTO? DocMaGiamGiaTheoMa(int maGiamGia)
+    {
+        if (maGiamGia <= 0) return null;
+        return dao.DocMaGiamGiaTheoMa(maGiamGia);
+    }
+
+    public string? ThemMaGiamGia(MaGiamGiaQuanLyDTO maGiamGia)
+    {
+        ChuanHoaMaGiamGia(maGiamGia);
+        string? loi = KiemTraMaGiamGia(maGiamGia, soLuotDaDung: 0);
         if (loi is not null) return loi;
         if (dao.TrungMa(maGiamGia.Ma)) return "Mã giảm giá đã tồn tại.";
 
-        // Không nhận UsedCount từ form; DAO để database áp dụng mặc định 0.
-        return dao.Them(maGiamGia) ? null : "Không thêm được mã giảm giá.";
+        // Không nhận SoLuotDaDung từ form; DAO để database áp dụng mặc định 0.
+        if (!dao.ThemMaGiamGia(maGiamGia))
+        {
+            return "Không thêm được mã giảm giá.";
+        }
+        return null;
     }
 
-    public string? Sua(MaGiamGiaQuanLyDTO maGiamGia)
+    public string? SuaMaGiamGia(MaGiamGiaQuanLyDTO maGiamGia)
     {
         if (maGiamGia.MaGiamGia <= 0) return "Mã giảm giá không hợp lệ.";
-        ChuanHoa(maGiamGia);
+        ChuanHoaMaGiamGia(maGiamGia);
 
-        // Lấy UsedCount hiện tại từ DB để không cho giảm hạn mức thấp hơn số đã dùng.
-        MaGiamGiaQuanLyDTO? duLieuHienTai = dao.DocTheoMa(maGiamGia.MaGiamGia);
+        // Lấy SoLuotDaDung hiện tại từ DB để không cho giảm hạn mức thấp hơn số đã dùng.
+        MaGiamGiaQuanLyDTO? duLieuHienTai = dao.DocMaGiamGiaTheoMa(maGiamGia.MaGiamGia);
         if (duLieuHienTai is null) return "Không tìm thấy mã giảm giá để cập nhật.";
 
-        string? loi = KiemTraDuLieu(maGiamGia, duLieuHienTai.SoLuotDaDung);
+        string? loi = KiemTraMaGiamGia(maGiamGia, duLieuHienTai.SoLuotDaDung);
         if (loi is not null) return loi;
         if (dao.TrungMa(maGiamGia.Ma, maGiamGia.MaGiamGia)) return "Mã giảm giá đã được mã khác sử dụng.";
 
         // Dùng số lượt dùng thật từ DB; không lấy số này từ form.
         maGiamGia.SoLuotDaDung = duLieuHienTai.SoLuotDaDung;
-        return dao.Sua(maGiamGia) ? null : "Không cập nhật được mã giảm giá. Hãy tải lại; mã có thể đã bị xóa hoặc lượt dùng đã vượt hạn mức đang nhập.";
+        if (!dao.SuaMaGiamGia(maGiamGia))
+        {
+            return "Không cập nhật được mã giảm giá. Hãy tải lại; mã có thể đã bị xóa hoặc lượt dùng đã vượt hạn mức đang nhập.";
+        }
+        return null;
     }
 
-    public string? Xoa(int maGiamGia)
+    public string? XoaMaGiamGia(int maGiamGia)
     {
         if (maGiamGia <= 0) return "Mã giảm giá không hợp lệ.";
-        return dao.Xoa(maGiamGia) ? null : "Không tìm thấy mã giảm giá để xóa.";
+        if (!dao.XoaMaGiamGia(maGiamGia))
+        {
+            return "Không tìm thấy mã giảm giá để xóa.";
+        }
+        return null;
     }
 
-    public ArrayList TimKiem(string? tuKhoa)
+    public ArrayList TimKiemMaGiamGia(string? tuKhoa)
     {
         string chuoiTim = tuKhoa?.Trim() ?? string.Empty;
         var ketQua = new ArrayList();
 
-        foreach (MaGiamGiaQuanLyDTO maGiamGia in dao.DocDanhSach())
+        ArrayList danhSach = DocDSMaGiamGia();
+        foreach (MaGiamGiaQuanLyDTO maGiamGia in danhSach)
         {
             bool khop = chuoiTim.Length == 0 ||
                 ChuaChuoi(maGiamGia.MaGiamGia.ToString(), chuoiTim) ||
@@ -77,28 +101,14 @@ public class MaGiamGiaBUS
     }
 
     // Tìm kiếm nhiều trường/điều kiện; lọc trong BUS bằng ArrayList.
-    public ArrayList TimKiemNangCao(ArrayList cacDieuKien) =>
-        TimKiemArrayList.LocDanhSach(dao.DocDanhSach(), cacDieuKien, LayGiaTriTruong);
+    public ArrayList TimKiemMaGiamGiaNangCao(ArrayList cacDieuKien)
+    {
+        ArrayList danhSach = DocDSMaGiamGia();
+        return TimKiemArrayList.LocDanhSach(danhSach, cacDieuKien);
+    }
 
-    private static object? LayGiaTriTruong(MaGiamGiaQuanLyDTO maGiamGia, string truong) =>
-        truong.Trim().Replace("_", string.Empty).ToUpperInvariant() switch
-        {
-            "DISCOUNTID" or "MAGIAMGIA" => maGiamGia.MaGiamGia,
-            "CODE" or "MA" => maGiamGia.Ma,
-            "DESCRIPTION" or "MOTA" => maGiamGia.MoTa,
-            "DISCOUNTTYPE" or "LOAIGIAM" => maGiamGia.LoaiGiam,
-            "DISCOUNTVALUE" or "GIATRIGIAM" => maGiamGia.GiaTriGiam,
-            "MINORDERAMOUNT" or "DONTOITHIEU" => maGiamGia.DonToiThieu,
-            "MAXDISCOUNTAMOUNT" or "GIAMTOIDA" => maGiamGia.GiamToiDa,
-            "STARTDATE" or "NGAYBATDAU" => maGiamGia.NgayBatDau,
-            "ENDDATE" or "NGAYKETTHUC" => maGiamGia.NgayKetThuc,
-            "USAGELIMIT" or "GIOIHANLUOTDUNG" => maGiamGia.GioiHanLuotDung,
-            "USEDCOUNT" or "SOLUOTDADUNG" => maGiamGia.SoLuotDaDung,
-            "STATUS" or "TRANGTHAI" => maGiamGia.TrangThai,
-            _ => throw new ArgumentException($"Không có trường DISCOUNT_CODE tên '{truong}'.", nameof(truong))
-        };
 
-    private static string? KiemTraDuLieu(MaGiamGiaQuanLyDTO maGiamGia, int soLuotDaDung)
+    private static string? KiemTraMaGiamGia(MaGiamGiaQuanLyDTO maGiamGia, int soLuotDaDung)
     {
         if (string.IsNullOrWhiteSpace(maGiamGia.Ma)) return "Mã giảm giá không được để trống.";
         if (maGiamGia.Ma.Length > 50) return "Mã giảm giá không được dài quá 50 ký tự.";
@@ -124,7 +134,7 @@ public class MaGiamGiaBUS
     private static bool DungKieuDecimal18_2(decimal giaTri) =>
         decimal.Abs(giaTri) <= 9999999999999999.99m && decimal.Round(giaTri, 2) == giaTri;
 
-    private static void ChuanHoa(MaGiamGiaQuanLyDTO maGiamGia)
+    private static void ChuanHoaMaGiamGia(MaGiamGiaQuanLyDTO maGiamGia)
     {
         maGiamGia.Ma = maGiamGia.Ma.Trim().ToUpperInvariant();
         maGiamGia.MoTa = maGiamGia.MoTa.Trim();

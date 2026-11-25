@@ -10,7 +10,7 @@ public class MaGiamGiaDAO
     private const string CacCot = "discount_id, code, description, discount_type, discount_value, min_order_amount, max_discount_amount, start_date, end_date, usage_limit, used_count, status";
 
     // Đọc tất cả mã giảm giá.
-    public List<MaGiamGiaQuanLyDTO> DocDanhSach()
+    public List<MaGiamGiaQuanLyDTO> DocDSMaGiamGia()
     {
         const string cauSQL = $"SELECT {CacCot} FROM dbo.DISCOUNT_CODE ORDER BY discount_id;";
         var danhSachMaGiamGia = new List<MaGiamGiaQuanLyDTO>();
@@ -28,7 +28,7 @@ public class MaGiamGiaDAO
     }
 
     // Đọc một mã theo khóa chính; trả null nếu không tồn tại.
-    public MaGiamGiaQuanLyDTO? DocTheoMa(int maGiamGia)
+    public MaGiamGiaQuanLyDTO? DocMaGiamGiaTheoMa(int maGiamGia)
     {
         string cauSQL = $"SELECT {CacCot} FROM dbo.DISCOUNT_CODE WHERE discount_id = @DiscountId;";
         using SqlConnection ketNoi = MyConnection.CreateConnection();
@@ -52,7 +52,7 @@ public class MaGiamGiaDAO
     }
 
     // Thêm mã mới; DB tự tạo ID và đặt used_count mặc định bằng 0.
-    public bool Them(MaGiamGiaQuanLyDTO maGiamGia)
+    public bool ThemMaGiamGia(MaGiamGiaQuanLyDTO maGiamGia)
     {
         // used_count không được nhập khi tạo mới; DB sẽ dùng giá trị mặc định 0.
         const string cauSQL = """
@@ -71,7 +71,7 @@ public class MaGiamGiaDAO
     }
 
     // Cập nhật thông tin cấu hình, nhưng giữ nguyên used_count do hệ thống đặt vé quản lý.
-    public bool Sua(MaGiamGiaQuanLyDTO maGiamGia)
+    public bool SuaMaGiamGia(MaGiamGiaQuanLyDTO maGiamGia)
     {
         // Không cập nhật used_count vì số lượt dùng do nghiệp vụ đặt vé quản lý.
         const string cauSQL = """
@@ -92,7 +92,7 @@ public class MaGiamGiaDAO
     }
 
     // Xóa theo ID; DB có thể từ chối nếu booking đã tham chiếu mã.
-    public bool Xoa(int maGiamGia)
+    public bool XoaMaGiamGia(int maGiamGia)
     {
         const string cauSQL = "DELETE FROM dbo.DISCOUNT_CODE WHERE discount_id = @DiscountId;";
         using SqlConnection ketNoi = MyConnection.CreateConnection();

@@ -11,15 +11,15 @@ internal static class EmployeeChecks
 
         NhanVienDTO missingPosition = ValidEmployee();
         missingPosition.ChucVu = " ";
-        CheckAssert.ErrorContains(bus.Them(missingPosition), "Chức vụ", "Employee rejects a blank position before database access");
+        CheckAssert.ErrorContains(bus.ThemNhanVien(missingPosition), "Chức vụ", "Employee rejects a blank position before database access");
 
         NhanVienDTO badStatus = ValidEmployee();
         badStatus.TrangThai = "PAUSED";
-        CheckAssert.ErrorContains(bus.Them(badStatus), "Trạng thái", "Employee rejects an unsupported status before database access");
+        CheckAssert.ErrorContains(bus.ThemNhanVien(badStatus), "Trạng thái", "Employee rejects an unsupported status before database access");
 
         NhanVienDTO badEmail = ValidEmployee();
         badEmail.Email = "not-an-email";
-        CheckAssert.ErrorContains(bus.Them(badEmail), "Email", "Employee rejects an invalid email before database access");
+        CheckAssert.ErrorContains(bus.ThemNhanVien(badEmail), "Email", "Employee rejects an invalid email before database access");
     }
 
     private static NhanVienDTO ValidEmployee() => new()

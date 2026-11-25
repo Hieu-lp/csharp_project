@@ -1,3 +1,4 @@
+using System.Collections;
 using FlightBooking.BUS;
 using FlightBooking.DTO;
 using Microsoft.Data.SqlClient;
@@ -140,9 +141,9 @@ public sealed class QuanLyNhanVienForm : Form
             WrapContents = true,
             Margin = new Padding(0, 0, 0, 8)
         };
-        vung.Controls.Add(TaoNut("Thêm", (_, _) => ThemBanGhi()));
-        vung.Controls.Add(TaoNut("Cập nhật", (_, _) => SuaBanGhi()));
-        vung.Controls.Add(TaoNut("Xóa", (_, _) => XoaBanGhi()));
+        vung.Controls.Add(TaoNut("Thêm", ThemNhanVien_Click));
+        vung.Controls.Add(TaoNut("Cập nhật", SuaNhanVien_Click));
+        vung.Controls.Add(TaoNut("Xóa", XoaNhanVien_Click));
         vung.Controls.Add(TaoNut("Làm trống form", (_, _) => XoaDuLieuNhap()));
         return vung;
     }
@@ -180,7 +181,7 @@ public sealed class QuanLyNhanVienForm : Form
         if (!CoTheRoiTrang()) return;
         try
         {
-            HienThiDanhSach(bus.DocDanhSach());
+            HienThiDanhSach(bus.DocDSNhanVien());
             thongBao.Text = $"Đang hiển thị {danhSach.Items.Count} nhân viên.";
         }
         catch (Exception loiGoc) { HienThiLoiDuLieu(loiGoc); }
@@ -191,18 +192,19 @@ public sealed class QuanLyNhanVienForm : Form
         if (!CoTheRoiTrang()) return;
         try
         {
-            var ketQua = bus.TimKiem(oTimKiem.Text).Cast<NhanVienDTO>().ToList();
+            ArrayList ketQua = bus.TimKiemNhanVien(oTimKiem.Text);
             HienThiDanhSach(ketQua);
             thongBao.Text = $"Tìm thấy {ketQua.Count} nhân viên.";
         }
         catch (Exception loiGoc) { HienThiLoiDuLieu(loiGoc); }
     }
 
-    private void ThemBanGhi()
+    private void ThemNhanVien_Click(object? nguoiGui, EventArgs suKien)
     {
         try
         {
-            string? loi = bus.Them(DocDuLieuNhap());
+            NhanVienDTO nhanVien = DocDuLieuNhap();
+            string? loi = bus.ThemNhanVien(nhanVien);
             if (HienThiLoiNghiepVu(loi)) return;
             duLieuBanDau = ChupDuLieu();
             TaiDanhSach();
@@ -212,7 +214,7 @@ public sealed class QuanLyNhanVienForm : Form
         catch (Exception loiGoc) { HienThiLoiDuLieu(loiGoc); }
     }
 
-    private void SuaBanGhi()
+    private void SuaNhanVien_Click(object? nguoiGui, EventArgs suKien)
     {
         if (!DocMaDaChon(out int ma))
         {
@@ -224,7 +226,7 @@ public sealed class QuanLyNhanVienForm : Form
         {
             NhanVienDTO nhanVien = DocDuLieuNhap();
             nhanVien.MaNhanVien = ma;
-            string? loi = bus.Sua(nhanVien);
+            string? loi = bus.SuaNhanVien(nhanVien);
             if (HienThiLoiNghiepVu(loi)) return;
             duLieuBanDau = ChupDuLieu();
             TaiDanhSach();
@@ -234,7 +236,7 @@ public sealed class QuanLyNhanVienForm : Form
         catch (Exception loiGoc) { HienThiLoiDuLieu(loiGoc); }
     }
 
-    private void XoaBanGhi()
+    private void XoaNhanVien_Click(object? nguoiGui, EventArgs suKien)
     {
         if (!DocMaDaChon(out int ma))
         {
@@ -246,7 +248,7 @@ public sealed class QuanLyNhanVienForm : Form
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         try
         {
-            string? loi = bus.Xoa(ma);
+            string? loi = bus.XoaNhanVien(ma);
             if (HienThiLoiNghiepVu(loi)) return;
             duLieuBanDau = ChupDuLieu();
             TaiDanhSach();
@@ -297,7 +299,10 @@ public sealed class QuanLyNhanVienForm : Form
     {
         if (xacNhan && !CoTheRoiTrang()) return;
         dangGanDuLieu = true;
-        foreach (ListViewItem dong in danhSach.SelectedItems.Cast<ListViewItem>().ToArray()) dong.Selected = false;
+        while (danhSach.SelectedItems.Count > 0)
+        {
+            danhSach.SelectedItems[0].Selected = false;
+        }
         dongDangChon = null;
         dangGanDuLieu = false;
         oMa.Clear();
@@ -370,7 +375,7 @@ public sealed class QuanLyNhanVienForm : Form
         return nut;
     }
 
-    private void HienThiDanhSach(IEnumerable<NhanVienDTO> nguon)
+    private void HienThiDanhSach(IEnumerable nguon)
     {
         dangGanDuLieu = true;
         danhSach.BeginUpdate();
@@ -380,8 +385,15 @@ public sealed class QuanLyNhanVienForm : Form
             dongDangChon = null;
             foreach (NhanVienDTO nhanVien in nguon)
             {
-                string[] cacO = [nhanVien.MaNhanVien.ToString(), nhanVien.HoTen, nhanVien.DienThoai, nhanVien.Email, nhanVien.ChucVu, nhanVien.NgayVaoLam.ToString("dd/MM/yyyy"), nhanVien.TrangThai == "ACTIVE" ? "Đang làm việc" : "Ngừng làm việc"];
-                danhSach.Items.Add(new ListViewItem(cacO) { Tag = nhanVien });
+                ListViewItem dong = new ListViewItem(nhanVien.MaNhanVien.ToString());
+                dong.SubItems.Add(nhanVien.HoTen);
+                dong.SubItems.Add(nhanVien.DienThoai);
+                dong.SubItems.Add(nhanVien.Email);
+                dong.SubItems.Add(nhanVien.ChucVu);
+                dong.SubItems.Add(nhanVien.NgayVaoLam.ToString("dd/MM/yyyy"));
+                dong.SubItems.Add(nhanVien.TrangThai == "ACTIVE" ? "Đang làm việc" : "Ngừng làm việc");
+                dong.Tag = nhanVien;
+                danhSach.Items.Add(dong);
             }
         }
         finally

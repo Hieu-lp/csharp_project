@@ -10,7 +10,7 @@ public class NhanVienDAO
     private const string CacCot = "employee_id, full_name, phone, email, position, hire_date, status";
 
     // Đọc toàn bộ nhân viên, mỗi dòng SQL thành một DTO.
-    public List<NhanVienDTO> DocDanhSach()
+    public List<NhanVienDTO> DocDSNhanVien()
     {
         const string cauSQL = $"SELECT {CacCot} FROM dbo.EMPLOYEE ORDER BY employee_id;";
         var danhSachNhanVien = new List<NhanVienDTO>();
@@ -28,7 +28,7 @@ public class NhanVienDAO
     }
 
     // Đọc theo khóa chính; trả null khi không có nhân viên đó.
-    public NhanVienDTO? DocTheoMa(int maNhanVien)
+    public NhanVienDTO? DocNhanVienTheoMa(int maNhanVien)
     {
         string cauSQL = $"SELECT {CacCot} FROM dbo.EMPLOYEE WHERE employee_id = @EmployeeId;";
         using SqlConnection ketNoi = MyConnection.CreateConnection();
@@ -60,7 +60,7 @@ public class NhanVienDAO
     }
 
     // Thêm nhân viên; employee_id do SQL Server tự tạo.
-    public bool Them(NhanVienDTO nhanVien)
+    public bool ThemNhanVien(NhanVienDTO nhanVien)
     {
         const string cauSQL = """
             INSERT INTO dbo.EMPLOYEE(full_name, phone, email, position, hire_date, status)
@@ -74,7 +74,7 @@ public class NhanVienDAO
     }
 
     // Cập nhật nhân viên theo ID.
-    public bool Sua(NhanVienDTO nhanVien)
+    public bool SuaNhanVien(NhanVienDTO nhanVien)
     {
         const string cauSQL = """
             UPDATE dbo.EMPLOYEE
@@ -91,7 +91,7 @@ public class NhanVienDAO
     }
 
     // Xóa theo ID; khóa ngoại từ BOOKING có thể từ chối xóa.
-    public bool Xoa(int maNhanVien)
+    public bool XoaNhanVien(int maNhanVien)
     {
         const string cauSQL = "DELETE FROM dbo.EMPLOYEE WHERE employee_id = @EmployeeId;";
         using SqlConnection ketNoi = MyConnection.CreateConnection();
