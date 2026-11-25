@@ -7,28 +7,28 @@ internal static class EmployeeChecks
 {
     public static void Run()
     {
-        var bus = new EmployeeBUS();
+        var bus = new NhanVienBUS();
 
-        EmployeeDTO missingPosition = ValidEmployee();
-        missingPosition.Position = " ";
-        CheckAssert.ErrorContains(bus.Add(missingPosition), "Chức vụ", "Employee rejects a blank position before database access");
+        NhanVienDTO missingPosition = ValidEmployee();
+        missingPosition.ChucVu = " ";
+        CheckAssert.ErrorContains(bus.ThemNhanVien(missingPosition), "Chức vụ", "Employee rejects a blank position before database access");
 
-        EmployeeDTO badStatus = ValidEmployee();
-        badStatus.Status = "PAUSED";
-        CheckAssert.ErrorContains(bus.Add(badStatus), "Trạng thái", "Employee rejects an unsupported status before database access");
+        NhanVienDTO badStatus = ValidEmployee();
+        badStatus.TrangThai = "PAUSED";
+        CheckAssert.ErrorContains(bus.ThemNhanVien(badStatus), "Trạng thái", "Employee rejects an unsupported status before database access");
 
-        EmployeeDTO badEmail = ValidEmployee();
+        NhanVienDTO badEmail = ValidEmployee();
         badEmail.Email = "not-an-email";
-        CheckAssert.ErrorContains(bus.Add(badEmail), "Email", "Employee rejects an invalid email before database access");
+        CheckAssert.ErrorContains(bus.ThemNhanVien(badEmail), "Email", "Employee rejects an invalid email before database access");
     }
 
-    private static EmployeeDTO ValidEmployee() => new()
+    private static NhanVienDTO ValidEmployee() => new()
     {
-        FullName = "Nhan vien Demo",
-        Phone = "0900000001",
+        HoTen = "Nhan vien Demo",
+        DienThoai = "0900000001",
         Email = "staff@example.test",
-        Position = "Nhân viên",
-        HireDate = new DateTime(2024, 1, 1),
-        Status = "ACTIVE"
+        ChucVu = "Nhân viên",
+        NgayVaoLam = new DateTime(2024, 1, 1),
+        TrangThai = "ACTIVE"
     };
 }

@@ -5,8 +5,10 @@ Kiến trúc **GUI → BUS → DAO**, DTO truyền dữ liệu giữa các lớp
 SqlClient và truy vấn tham số hóa. Identifier nghiệp vụ dùng tiếng Việt không dấu.
 
 Hiếu quản lý sân bay, chuyến bay, hạng vé và tìm kiếm ArrayList AND/OR/NOT.
-MainForm và các màn hình khách hàng/nhân viên/mã giảm giá đã có trên develop;
-menu quản lý chuyến bay mở Form1 với ba tab Việt hóa của Hiếu.
+Phú quản lý khách hàng, nhân viên và mã giảm giá. MainForm dùng một vùng nội dung
+chung cho bảy mục: Tổng quan, Sân bay, Chuyến bay, Hạng vé, Khách hàng, Nhân viên,
+Mã giảm giá. Ba tab của Hiếu và ListView cha–con được giữ; chuyển chức năng
+phải xác nhận nếu còn thay đổi chưa lưu. Các module Phú dùng ListView và tên Việt hóa.
 Thịnh triển khai tìm/chọn chuyến, báo giá server, đặt vé một chiều/khứ hồi,
 tra cứu và hủy. Đặt/hủy chạy trong transaction, bảo vệ ghế, giá lịch sử và
 yêu cầu gửi lặp; hóa đơn mới UNPAID, chưa ghi doanh thu đã thu.
@@ -23,7 +25,7 @@ yêu cầu gửi lặp; hóa đơn mới UNPAID, chưa ghi doanh thu đã thu.
 ```powershell
 git clone https://github.com/Hieu-lp/csharp_project.git
 Set-Location csharp_project
-git switch feature/integration-w7-final
+git switch develop
 dotnet restore FlightBookingSystem.slnx
 dotnet build FlightBookingSystem.slnx
 ```

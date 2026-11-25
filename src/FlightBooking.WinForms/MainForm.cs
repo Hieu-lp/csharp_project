@@ -1,168 +1,165 @@
 namespace FlightBooking.WinForms;
 
-/// <summary>MainForm chứa menu tổng và mở các màn hình quản lý trong vùng nội dung.</summary>
+/// <summary>Một màn hình chính, các chức năng dùng chung vùng nội dung.</summary>
 public sealed class MainForm : Form
 {
-    private readonly Panel _contentPanel = new() { Dock = DockStyle.Fill, Padding = new Padding(12) };
-    private Form? _activeModule;
+    private readonly Panel vungNoiDung = new() { Dock = DockStyle.Fill, Margin = Padding.Empty };
+    private readonly Dictionary<string, Button> cacNut = new();
+    private Form? moduleDangMo;
+    private string mucDangChon = "";
 
     public MainForm()
     {
-        Text = "Flight Booking System - Quản trị";
-        StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(1150, 760);
-        Size = new Size(1450, 920);
-        Font = new Font("Segoe UI", 9F);
-
-        BuildLayout();
-        ShowHome();
+        Text = "FlightBooking · Quản trị";
+        StartPosition = FormStartPosition.Manual;
+        var vungLamViec = Screen.FromPoint(Cursor.Position).WorkingArea;
+        Bounds = GiaoDien.KichThuocCuaSo(vungLamViec, new Size(1450, 920));
+        MinimumSize = new Size(Math.Min(1040, vungLamViec.Width - 24), Math.Min(640, vungLamViec.Height - 24));
+        Font = new Font("Segoe UI", 10F);
+        BackColor = GiaoDien.MauNen;
+        ForeColor = GiaoDien.MauChu;
+        TaoBoCuc();
+        HienThiTongQuan();
+        FormClosing += (_, suKien) => suKien.Cancel = !CoTheRoiModule();
     }
 
-    private void BuildLayout()
+    private void TaoBoCuc()
     {
-        var menu = BuildMenu();
-        var body = new TableLayoutPanel
+        var khungChinh = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 1,
-            Margin = new Padding(0)
+            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
+            Margin = Padding.Empty, Padding = Padding.Empty
         };
-        body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 220));
-        body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        body.Controls.Add(BuildNavigation(), 0, 0);
-        body.Controls.Add(_contentPanel, 1, 0);
-
-        var root = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 2,
-            Margin = new Padding(0)
-        };
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.Controls.Add(menu, 0, 0);
-        root.Controls.Add(body, 0, 1);
-        Controls.Add(root);
+        khungChinh.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 200));
+        khungChinh.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        khungChinh.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        khungChinh.Controls.Add(TaoThanhDieuHuong(), 0, 0);
+        khungChinh.Controls.Add(vungNoiDung, 1, 0);
+        Controls.Add(khungChinh);
     }
 
-    private MenuStrip BuildMenu()
+    private Control TaoThanhDieuHuong()
     {
-        var menu = new MenuStrip { Dock = DockStyle.Fill };
-        var fileMenu = new ToolStripMenuItem("Tệp");
-        fileMenu.DropDownItems.Add("Trang chủ", null, (_, _) => ShowHome());
-        fileMenu.DropDownItems.Add(new ToolStripSeparator());
-        fileMenu.DropDownItems.Add("Thoát", null, (_, _) => Close());
-
-        var managementMenu = new ToolStripMenuItem("Quản lý");
-        managementMenu.DropDownItems.Add("Khách hàng", null, (_, _) => OpenModule(new CustomerManagementForm()));
-        managementMenu.DropDownItems.Add("Nhân viên", null, (_, _) => OpenModule(new EmployeeManagementForm()));
-        managementMenu.DropDownItems.Add("Mã giảm giá", null, (_, _) => OpenModule(new DiscountCodeManagementForm()));
-        managementMenu.DropDownItems.Add("Sân bay / chuyến bay / hạng vé", null, (_, _) => OpenFlightManagement());
-
-        var helpMenu = new ToolStripMenuItem("Trợ giúp");
-        helpMenu.DropDownItems.Add("Giới thiệu", null, (_, _) =>
-            MessageBox.Show("Ứng dụng quản lý hệ thống đặt vé máy bay.", "Giới thiệu",
-                MessageBoxButtons.OK, MessageBoxIcon.Information));
-
-        menu.Items.AddRange([fileMenu, managementMenu, helpMenu]);
-        MainMenuStrip = menu;
-        return menu;
-    }
-
-    private Control BuildNavigation()
-    {
-        var sidebar = new Panel
+        var thanhBen = new Panel
         {
-            Dock = DockStyle.Fill,
-            Padding = new Padding(12),
-            BackColor = Color.FromArgb(34, 45, 65)
+            Dock = DockStyle.Fill, AutoScroll = true,
+            Padding = new Padding(12), BackColor = Color.FromArgb(30, 41, 59)
         };
-        var stack = new FlowLayoutPanel
+        var danhSachNut = new FlowLayoutPanel
         {
-            Dock = DockStyle.Top,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
-            AutoSize = true
+            Dock = DockStyle.Top, FlowDirection = FlowDirection.TopDown,
+            WrapContents = false, AutoSize = true
         };
-        stack.Controls.Add(new Label
+        danhSachNut.Controls.Add(new Label
         {
-            AutoSize = true,
-            Text = "FLIGHT BOOKING",
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-            Margin = new Padding(4, 4, 4, 22)
+            AutoSize = true, Text = "FLIGHTBOOKING", ForeColor = Color.White,
+            Font = new Font("Segoe UI", 12F, FontStyle.Bold), Margin = new Padding(4, 10, 4, 24)
         });
-        stack.Controls.Add(CreateNavigationButton("Trang chủ", (_, _) => ShowHome()));
-        stack.Controls.Add(CreateNavigationButton("Quản lý khách hàng", (_, _) => OpenModule(new CustomerManagementForm())));
-        stack.Controls.Add(CreateNavigationButton("Quản lý nhân viên", (_, _) => OpenModule(new EmployeeManagementForm())));
-        stack.Controls.Add(CreateNavigationButton("Quản lý mã giảm giá", (_, _) => OpenModule(new DiscountCodeManagementForm())));
-        stack.Controls.Add(CreateNavigationButton("Quản lý chuyến bay", (_, _) => OpenFlightManagement()));
-        sidebar.Controls.Add(stack);
-        return sidebar;
+        ThemNutDieuHuong(danhSachNut, "Tổng quan", HienThiTongQuan);
+        ThemNutDieuHuong(danhSachNut, "Sân bay", () => MoQuanLyChuyenBay(LoaiDanhMuc.SanBay, "Sân bay"));
+        ThemNutDieuHuong(danhSachNut, "Chuyến bay", () => MoQuanLyChuyenBay(LoaiDanhMuc.ChuyenBay, "Chuyến bay"));
+        ThemNutDieuHuong(danhSachNut, "Hạng vé", () => MoQuanLyChuyenBay(LoaiDanhMuc.HangVe, "Hạng vé"));
+        ThemNutDieuHuong(danhSachNut, "Khách hàng", () => MoModule("Khách hàng", () => new QuanLyKhachHangForm()));
+        ThemNutDieuHuong(danhSachNut, "Nhân viên", () => MoModule("Nhân viên", () => new QuanLyNhanVienForm()));
+        ThemNutDieuHuong(danhSachNut, "Mã giảm giá", () => MoModule("Mã giảm giá", () => new QuanLyMaGiamGiaForm()));
+        ThemNutDieuHuong(danhSachNut, "Giới thiệu", () => MessageBox.Show(this,
+            "Ứng dụng quản lý hệ thống đặt vé máy bay.", "Giới thiệu", MessageBoxButtons.OK, MessageBoxIcon.Information));
+        ThemNutDieuHuong(danhSachNut, "Thoát", Close);
+        thanhBen.Controls.Add(danhSachNut);
+        return thanhBen;
     }
 
-    private void OpenFlightManagement()
+    private void ThemNutDieuHuong(FlowLayoutPanel danhSach, string ten, Action xuLy)
     {
-        using var flightManagement = new Form1();
-        flightManagement.ShowDialog(this);
-    }
-
-    private static Button CreateNavigationButton(string text, EventHandler click)
-    {
-        var button = new Button
+        var nut = new Button
         {
-            Text = text,
-            Width = 194,
-            Height = 42,
-            TextAlign = ContentAlignment.MiddleLeft,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(48, 62, 86),
-            ForeColor = Color.White,
-            Margin = new Padding(0, 0, 0, 8),
-            Padding = new Padding(10, 0, 4, 0)
+            Text = ten, Width = 172, Height = 44, TextAlign = ContentAlignment.MiddleLeft,
+            FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(30, 41, 59),
+            ForeColor = Color.White, Margin = new Padding(0, 0, 0, 8), Padding = new Padding(10, 0, 4, 0)
         };
-        button.FlatAppearance.BorderSize = 0;
-        button.Click += click;
-        return button;
+        nut.FlatAppearance.BorderSize = 0;
+        nut.FlatAppearance.MouseOverBackColor = Color.FromArgb(51, 65, 85);
+        nut.Click += (_, _) => xuLy();
+        cacNut.Add(ten, nut);
+        danhSach.Controls.Add(nut);
     }
 
-    private void ShowHome()
+    private bool CoTheRoiModule() => moduleDangMo switch
     {
-        CloseActiveModule();
-        var welcome = new Label
+        Form1 quanLy => quanLy.CoTheRoiTrang(),
+        QuanLyKhachHangForm khachHang => khachHang.CoTheRoiTrang(),
+        QuanLyNhanVienForm nhanVien => nhanVien.CoTheRoiTrang(),
+        QuanLyMaGiamGiaForm maGiamGia => maGiamGia.CoTheRoiTrang(),
+        _ => true
+    };
+
+    private void MoQuanLyChuyenBay(LoaiDanhMuc loai, string ten)
+    {
+        if (moduleDangMo is Form1 quanLy)
         {
-            Dock = DockStyle.Fill,
-            Text = "Chào mừng đến với hệ thống quản lý đặt vé máy bay.\n\nChọn một mục trong menu để bắt đầu.",
-            TextAlign = ContentAlignment.MiddleCenter,
-            Font = new Font("Segoe UI", 16F),
-            ForeColor = Color.FromArgb(48, 62, 86)
-        };
-        _contentPanel.Controls.Add(welcome);
+            if (quanLy.ChonTrang(loai)) DanhDauMuc(ten);
+            return;
+        }
+        if (!CoTheRoiModule()) return;
+        var manHinh = new Form1();
+        manHinh.TrangDaChon += trang => DanhDauMuc(trang switch
+        {
+            LoaiDanhMuc.SanBay => "Sân bay", LoaiDanhMuc.ChuyenBay => "Chuyến bay", _ => "Hạng vé"
+        });
+        // Chọn tab khi form chưa hiện để việc tải tab đầu không chặn điều hướng.
+        manHinh.ChonTrang(loai);
+        HienThiModule(manHinh);
+        DanhDauMuc(ten);
     }
 
-    private void OpenModule(Form module)
+    private void MoModule(string ten, Func<Form> taoModule)
     {
-        CloseActiveModule();
-        _activeModule = module;
+        if (mucDangChon == ten || !CoTheRoiModule()) return;
+        HienThiModule(taoModule());
+        DanhDauMuc(ten);
+    }
+
+    private void HienThiModule(Form module)
+    {
+        DongModule();
+        moduleDangMo = module;
         module.TopLevel = false;
         module.FormBorderStyle = FormBorderStyle.None;
+        module.MinimumSize = Size.Empty;
         module.Dock = DockStyle.Fill;
-        _contentPanel.Controls.Add(module);
+        vungNoiDung.Controls.Add(module);
         module.Show();
     }
 
-    private void CloseActiveModule()
+    private void HienThiTongQuan()
     {
-        foreach (Control control in _contentPanel.Controls.Cast<Control>().ToArray())
+        if (mucDangChon == "Tổng quan" || !CoTheRoiModule()) return;
+        DongModule();
+        vungNoiDung.Controls.Add(new Label
         {
-            _contentPanel.Controls.Remove(control);
-            control.Dispose();
-        }
+            Dock = DockStyle.Fill,
+            Text = "HỆ THỐNG QUẢN LÝ ĐẶT VÉ MÁY BAY\n\nChọn chức năng ở thanh điều hướng để bắt đầu.",
+            TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 16F),
+            ForeColor = GiaoDien.MauChu
+        });
+        DanhDauMuc("Tổng quan");
+    }
 
-        _activeModule = null;
+    private void DongModule()
+    {
+        // Mỗi đường gọi đã kiểm tra dữ liệu chưa lưu trước khi giải phóng giao diện cũ.
+        foreach (Control dieuKhien in vungNoiDung.Controls.Cast<Control>().ToArray())
+        {
+            vungNoiDung.Controls.Remove(dieuKhien);
+            dieuKhien.Dispose();
+        }
+        moduleDangMo = null;
+    }
+
+    private void DanhDauMuc(string ten)
+    {
+        mucDangChon = ten;
+        foreach (var (nhan, nut) in cacNut)
+            nut.BackColor = nhan == ten ? GiaoDien.MauChinh : Color.FromArgb(30, 41, 59);
     }
 }
