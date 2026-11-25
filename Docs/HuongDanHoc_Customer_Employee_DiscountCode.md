@@ -32,7 +32,7 @@ WinForms (GUI) -> BUS -> DAO -> SQL Server
                     DTO mang dữ liệu giữa các lớp
 ```
 
-- **DTO**: mang dữ liệu của một thực thể. Ví dụ một dòng `CUSTOMER` thành một `CustomerDTO`.
+- **DTO**: mang dữ liệu của một thực thể. Ví dụ một dòng `CUSTOMER` thành một `KhachHangDTO`.
 - **DAO**: chạy SQL, đọc kết quả và chuyển từng dòng thành DTO. DAO không quyết định quy tắc giao diện.
 - **BUS**: kiểm tra dữ liệu, luật nghiệp vụ và tìm kiếm; sau đó gọi DAO.
 - **GUI / WinForms**: nhận thao tác người dùng, gọi BUS và hiển thị kết quả.
@@ -52,13 +52,13 @@ Schema đang dùng nằm trong `Database/02_CreateTables.sql`. Không tự sửa
 
 | Cột DB | Kiểu / luật | Property DTO dự kiến |
 |---|---|---|
-| `customer_id` | `INT IDENTITY`, khóa chính | `int CustomerId` |
-| `full_name` | `NVARCHAR(100) NOT NULL` | `string FullName` |
-| `phone` | `VARCHAR(20) NOT NULL` | `string Phone` |
+| `customer_id` | `INT IDENTITY`, khóa chính | `int MaKhachHang` |
+| `full_name` | `NVARCHAR(100) NOT NULL` | `string HoTen` |
+| `phone` | `VARCHAR(20) NOT NULL` | `string DienThoai` |
 | `email` | `VARCHAR(100) NOT NULL` | `string Email` |
-| `date_of_birth` | `DATE NOT NULL` | `DateTime DateOfBirth` |
-| `gender` | `NVARCHAR(10) NOT NULL` | `string Gender` |
-| `id_passport_number` | `VARCHAR(50) NULL` | `string? IdPassportNumber` |
+| `date_of_birth` | `DATE NOT NULL` | `DateTime NgaySinh` |
+| `gender` | `NVARCHAR(10) NOT NULL` | `string GioiTinh` |
+| `id_passport_number` | `VARCHAR(50) NULL` | `string? SoGiayTo` |
 
 Số điện thoại là chuỗi, không phải số nguyên: cần giữ số `0` đầu và có thể có dấu `+`. Hộ chiếu nullable vì DB cho phép `NULL`. Bảng hiện không có unique constraint cho phone, email hay hộ chiếu; nếu kiểm tra trùng trong BUS thì đó mới là kiểm tra ở ứng dụng. Không tự thêm constraint DB nếu chưa trao đổi người phụ trách DB.
 
@@ -116,17 +116,17 @@ ERD gửi kèm có chỗ ghi `varchar` cho trường tên/mô tả và dùng ký
 
 ## 7. Code đã làm và cách đọc
 
-### CustomerDTO
+### KhachHangDTO
 
-File: `src/FlightBooking.DTO/CustomerDTO.cs`.
+File: `src/FlightBooking.DTO/KhachHangDTO.cs`.
 
-Đây là khuôn dữ liệu một khách hàng. `get` đọc property, `set` gán property. Các chuỗi bắt buộc khởi tạo bằng `string.Empty` vì project bật nullable reference types. `IdPassportNumber` có dấu `?` vì cột DB nhận `NULL`. `CustomerId` do DB tự tạo khi insert.
+Đây là khuôn dữ liệu một khách hàng. `get` đọc property, `set` gán property. Các chuỗi bắt buộc khởi tạo bằng `string.Empty` vì project bật nullable reference types. `SoGiayTo` có dấu `?` vì cột DB nhận `NULL`. `MaKhachHang` do DB tự tạo khi insert.
 
-### EmployeeDTO và DiscountCodeDTO
+### NhanVienDTO và MaGiamGiaQuanLyDTO
 
-Files: `src/FlightBooking.DTO/EmployeeDTO.cs` và `src/FlightBooking.DTO/DiscountCodeDTO.cs`.
+Files: `src/FlightBooking.DTO/NhanVienDTO.cs` và `src/FlightBooking.DTO/MaGiamGiaQuanLyDTO.cs`.
 
-`EmployeeDTO.Status` mặc định `ACTIVE`, khớp default và `CHECK` của bảng. Trong `DiscountCodeDTO`, `MaxDiscountAmount` và `UsageLimit` dùng kiểu nullable vì cột DB cho phép `NULL`; `UsedCount` được đọc để hiển thị nhưng không được nhập/sửa từ form giảm giá.
+`NhanVienDTO.TrangThai` mặc định `ACTIVE`, khớp default và `CHECK` của bảng. Trong `MaGiamGiaQuanLyDTO`, `GiamToiDa` và `GioiHanLuotDung` dùng kiểu nullable vì cột DB cho phép `NULL`; `SoLuotDaDung` được đọc để hiển thị nhưng không được nhập/sửa từ form giảm giá.
 
 ### MyConnection
 
@@ -135,37 +135,37 @@ File: `src/FlightBooking.DAO/MyConnection.cs`.
 `MyConnection` hiện hỗ trợ hai cách dùng để tương thích với Web booking và các DAO quản lý:
 
 - `new MyConnection(connectionString).Open()` mở kết nối mà Web booking đã cấu hình.
-- `CreateConnection()` đọc biến môi trường `FLIGHTBOOKING_DB_CONNECTION`, tạo kết nối chưa mở để Customer/Employee/Discount DAO tự mở và giải phóng bằng `using`.
+- `CreateConnection()` ưu tiên `ConnectionStrings__FlightBookingDB`, rồi fallback `FLIGHTBOOKING_DB_CONNECTION`, tạo kết nối chưa mở để Customer/Employee/Discount DAO tự mở và giải phóng bằng `using`.
 
 Nếu biến môi trường thiếu, `CreateConnection()` ném `InvalidOperationException` với hướng dẫn. Không ghi mật khẩu vào code hoặc commit.
 
-Biến môi trường này **chưa được cấu hình**, nên hiện chưa thể chạy truy vấn với SQL Server. Cần cấu hình cho tiến trình chạy WinForms trước bước chạy thử.
+Cấu hình kết nối riêng cho tiến trình WinForms; không lưu credential trong repository. Lần tích hợp này chỉ restore/build, không chạy SQL nghiệp vụ.
 
-### CustomerDAO.GetAll
+### KhachHangDAO.DocDanhSach
 
-File: `src/FlightBooking.DAO/CustomerDAO.cs`.
+File: `src/FlightBooking.DAO/KhachHangDAO.cs`.
 
-Phương thức dùng `SELECT` lấy các cột rõ ràng từ `dbo.CUSTOMER`. `List<CustomerDTO>` chứa 0 hoặc nhiều kết quả. `SqlDataReader.Read()` đi qua từng dòng; mỗi dòng được ánh xạ thành một DTO rồi `Add()` vào danh sách. `GetOrdinal("column")` lấy chỉ số cột theo tên. `IsDBNull()` phải kiểm tra hộ chiếu trước `GetString()`, vì `GetString()` không đọc được SQL `NULL`. Cuối cùng trả về danh sách cho lớp gọi.
+Phương thức dùng `SELECT` lấy các cột rõ ràng từ `dbo.CUSTOMER`. `List<KhachHangDTO>` chứa 0 hoặc nhiều kết quả. `SqlDataReader.Read()` đi qua từng dòng; mỗi dòng được ánh xạ thành một DTO rồi `Add()` vào danh sách. `GetOrdinal("column")` lấy chỉ số cột theo tên. `IsDBNull()` phải kiểm tra hộ chiếu trước `GetString()`, vì `GetString()` không đọc được SQL `NULL`. Cuối cùng trả về danh sách cho lớp gọi.
 
 Mẫu nhớ: **một dòng SQL -> một DTO; nhiều dòng -> một danh sách DTO.**
 
 ### Ba DAO và CRUD
 
-Files: `CustomerDAO.cs`, `EmployeeDAO.cs`, `DiscountCodeDAO.cs` trong `src/FlightBooking.DAO/`.
+Files: `KhachHangDAO.cs`, `NhanVienDAO.cs`, `MaGiamGiaDAO.cs` trong `src/FlightBooking.DAO/`.
 
-Mỗi DAO có `GetAll`, `GetById`, `Insert`, `Update`, `Delete`; hàm tra trùng kiểm tra các trường cần thiết. `GetById` trả `null` nếu không thấy. `Insert` không tự gán ID identity. DAO dùng `ExecuteReader()` để đọc nhiều cột, `ExecuteScalar()` để đếm kết quả kiểm tra trùng, và `ExecuteNonQuery()` cho thêm/sửa/xóa. Các truy vấn nhận dữ liệu đều dùng parameter có tên và kiểu SQL rõ ràng.
+Mỗi DAO có `DocDanhSach`, `DocTheoMa`, `Them`, `Sua`, `Xoa`; hàm tra trùng kiểm tra các trường cần thiết. `DocTheoMa` trả `null` nếu không thấy. `Them` không tự gán ID identity. DAO dùng `ExecuteReader()` để đọc nhiều cột, `ExecuteScalar()` để đếm kết quả kiểm tra trùng, và `ExecuteNonQuery()` cho thêm/sửa/xóa. Các truy vấn nhận dữ liệu đều dùng parameter có tên và kiểu SQL rõ ràng.
 
 Khi xóa khách hàng/nhân viên/mã giảm giá đã được booking tham chiếu, database có thể trả lỗi khóa ngoại. DAO không nuốt lỗi đó; GUI sau này cần bắt lỗi và báo cho người dùng. Mình không chạy các lệnh CRUD lên DB trong lúc viết code.
 
-`DiscountCodeDAO` không chèn `used_count` khi tạo (DB mặc định 0) và không cập nhật trường này khi sửa. Đếm lượt dùng là nghiệp vụ của đặt vé. Tham số `DECIMAL(18,2)` khai báo `Precision = 18`, `Scale = 2`; thời gian dùng `DATETIME2(0)`.
+`MaGiamGiaDAO` không chèn `used_count` khi tạo (DB mặc định 0) và không cập nhật trường này khi sửa. Đếm lượt dùng là nghiệp vụ của đặt vé. Tham số `DECIMAL(18,2)` khai báo `Precision = 18`, `Scale = 2`; thời gian dùng `DATETIME2(0)`.
 
 ### Ba BUS và tìm kiếm bằng ArrayList
 
-Files: `CustomerBUS.cs`, `EmployeeBUS.cs`, `DiscountCodeBUS.cs` và `ArrayListSearch.cs` trong `src/FlightBooking.BUS/`.
+Files: `KhachHangBUS.cs`, `NhanVienBUS.cs`, `MaGiamGiaBUS.cs` và `TimKiemArrayList.cs` trong `src/FlightBooking.BUS/`.
 
-BUS chuẩn hóa chuỗi, kiểm tra bắt buộc/độ dài/email/ngày/trạng thái/giá trị giảm, gọi DAO kiểm tra trùng rồi mới thêm hoặc sửa. Các phương thức `Add`, `Update`, `Delete` trả `null` khi thành công hoặc chuỗi tiếng Việt khi nghiệp vụ không hợp lệ/không tìm thấy. Lỗi SQL như khóa ngoại vẫn được để lớp gọi xử lý.
+BUS chuẩn hóa chuỗi, kiểm tra bắt buộc/độ dài/email/ngày/trạng thái/giá trị giảm, gọi DAO kiểm tra trùng rồi mới thêm hoặc sửa. Các phương thức `Add`, `Sua`, `Xoa` trả `null` khi thành công hoặc chuỗi tiếng Việt khi nghiệp vụ không hợp lệ/không tìm thấy. Lỗi SQL như khóa ngoại vẫn được để lớp gọi xử lý.
 
-`Search(keyword)` lấy danh sách từ DAO rồi lọc trong BUS, trả kết quả dạng `ArrayList`. `SearchAdvanced(ArrayList conditions)` dùng `SearchConditionDTO` gồm `Field`, `Operator`, `Value`, `LogicalOperator`; hỗ trợ `=`, `<>`, `>`, `>=`, `<`, `<=`, `CONTAINS` và nối điều kiện `AND`, `OR`, `NOT`. Điều kiện được tính lần lượt từ trái sang phải; `NOT` có nghĩa `AND NOT` với điều kiện hiện tại. Trường cần lọc phải là tên property hoặc tên cột tương ứng như `DateOfBirth`/`date_of_birth`.
+`Search(keyword)` lấy danh sách từ DAO rồi lọc trong BUS, trả kết quả dạng `ArrayList`. `SearchAdvanced(ArrayList conditions)` dùng `DieuKienTimKiemDTO` gồm `Field`, `Operator`, `Value`, `LogicalOperator`; hỗ trợ `=`, `<>`, `>`, `>=`, `<`, `<=`, `CONTAINS` và nối điều kiện `AND`, `OR`, `NOT`. Điều kiện được tính lần lượt từ trái sang phải; `NOT` có nghĩa `AND NOT` với điều kiện hiện tại. Trường cần lọc phải là tên property hoặc tên cột tương ứng như `NgaySinh`/`date_of_birth`.
 
 Giới hạn hiện tại: tìm kiếm nạp các dòng qua DAO rồi lọc trong bộ nhớ để đáp ứng yêu cầu BUS/`ArrayList`; phù hợp dữ liệu đồ án, nhưng có thể tốn tài nguyên nếu bảng rất lớn.
 
@@ -186,7 +186,7 @@ Giới hạn hiện tại: tìm kiếm nạp các dòng qua DAO rồi lọc tron
 | ManagementChecks offline | 12/12 đạt; không kết nối SQL |
 | Chạy thử CRUD với SQL Server | Chưa làm; cần database test được phép ghi |
 | Commit code và push | Đã push lên `feature/customer-management` |
-| Đồng bộ develop | Đã nhập `origin/develop`; xử lý tương thích API kết nối và DiscountCodeDTO |
+| Đồng bộ develop | Đã nhập `origin/develop`; xử lý tương thích API kết nối và MaGiamGiaQuanLyDTO |
 | PR vào develop và review | Chưa tạo |
 
 ## 9. Cách học và quy trình tiếp theo
@@ -203,10 +203,10 @@ Trạng thái triển khai phần WinForms:
 
 ## Trạng thái triển khai
 
-- Đã tạo `CustomerManagementForm`, `EmployeeManagementForm` và `DiscountCodeManagementForm` với xem, tìm, thêm, cập nhật, xóa và chọn dòng.
+- Đã tạo `QuanLyKhachHangForm`, `QuanLyNhanVienForm` và `QuanLyMaGiamGiaForm` với xem, tìm, thêm, cập nhật, xóa và chọn dòng.
 - Đã tạo `MainForm` có menu trên và thanh điều hướng; `Program.cs` mở `MainForm`.
-- Form nhân viên dùng `EmployeeBUS` để kiểm tra trùng phone/email và trạng thái.
-- Form mã giảm giá dùng `DiscountCodeBUS` để kiểm tra mã trùng, loại/giá trị giảm, thời hạn và giới hạn lượt; `UsedCount` chỉ đọc.
+- Form nhân viên dùng `NhanVienBUS` để kiểm tra trùng phone/email và trạng thái.
+- Form mã giảm giá dùng `MaGiamGiaBUS` để kiểm tra mã trùng, loại/giá trị giảm, thời hạn và giới hạn lượt; `SoLuotDaDung` chỉ đọc.
 - Tìm kiếm mã giảm giá bao gồm min order, max discount, usage limit và used count.
 - `dotnet build FlightBookingSystem.slnx -c Release` thành công, 0 cảnh báo, 0 lỗi.
 - Project `tests/FlightBooking.ManagementChecks` có 12 check offline cho validation Customer/Employee/DiscountCode và lọc `ArrayList`; cả 12 đều đạt.
@@ -215,7 +215,7 @@ Trạng thái triển khai phần WinForms:
 
 ## Luồng dữ liệu
 
-`CustomerManagementForm → CustomerBUS → CustomerDAO → SQL Server`
+`QuanLyKhachHangForm → KhachHangBUS → KhachHangDAO → SQL Server`
 
 - Form lấy dữ liệu từ các ô nhập, gọi BUS và hiển thị thông báo/kết quả.
 - BUS kiểm tra dữ liệu và gọi DAO; form không tự viết SQL.
@@ -223,9 +223,9 @@ Trạng thái triển khai phần WinForms:
 
 ## Các phần giao diện
 
-- Ô tìm kiếm gọi `CustomerBUS.Search`; kết quả `ArrayList` được chuyển thành `List<CustomerDTO>` để gán cho `DataGridView`.
+- Ô tìm kiếm gọi `KhachHangBUS.TimKiem`; kết quả `ArrayList` được chuyển thành `List<KhachHangDTO>` để gán cho `ListView`.
 - Bảng chỉ đọc; chọn một dòng sẽ chép dữ liệu vào các ô nhập để cập nhật hoặc xóa.
-- Thêm, cập nhật và xóa gọi lần lượt `Add`, `Update`, `Delete` trong BUS.
+- Thêm, cập nhật và xóa gọi lần lượt `Add`, `Sua`, `Xoa` trong BUS.
 - ID chỉ đọc vì SQL Server tự tạo; form không gửi ID khi thêm.
 - Xóa luôn hỏi xác nhận. Nếu database từ chối vì khách hàng đang được booking tham chiếu, lỗi được hiển thị cho người dùng.
 - Nếu chưa cấu hình `FLIGHTBOOKING_DB_CONNECTION` hoặc SQL Server không sẵn sàng, form báo lỗi khi nạp/thao tác dữ liệu.
@@ -233,9 +233,30 @@ Trạng thái triển khai phần WinForms:
 ## Bài tập tự viết lại
 
 1. Giải thích vì sao `AddCustomer` gọi BUS thay vì chứa câu `INSERT`.
-2. Viết lại luồng chọn một dòng: `DataBoundItem → CustomerDTO → điền TextBox`.
+2. Viết lại luồng chọn một dòng: `DataBoundItem → KhachHangDTO → điền TextBox`.
 3. Giải thích `ShowBusinessError`: vì sao `null` nghĩa là không có lỗi.
-4. Tập viết lại `SearchCustomers`: gọi BUS, chuyển `ArrayList` sang DTO list, gán `DataSource`.
+4. Tập viết lại `SearchCustomers`: gọi BUS, chuyển `ArrayList` sang DTO list, gán `Items/Tag`.
 5. So sánh form nhân viên với form khách hàng: các bước CRUD nào giống nhau?
-6. Giải thích vì sao form mã giảm giá không cho sửa `UsedCount`.
+6. Giải thích vì sao form mã giảm giá không cho sửa `SoLuotDaDung`.
 7. Lần theo một lần nhấn menu: `MainForm → form con → BUS`.
+
+
+## 11. Tích hợp sau PR #10
+
+PR #5 đã được revert ở #6; PR #8 đã khôi phục module Phú. Nhánh cá nhân không còn commit thiếu trên develop. Nhánh integration-phu chỉ hoàn thiện Việt hóa và giao diện; không merge lại nguồn cũ.
+
+| Tên trước tích hợp | Tên hiện tại |
+|---|---|
+| CustomerBUS / CustomerDAO / CustomerDTO | KhachHangBUS / KhachHangDAO / KhachHangDTO |
+| EmployeeBUS / EmployeeDAO / EmployeeDTO | NhanVienBUS / NhanVienDAO / NhanVienDTO |
+| DiscountCodeBUS / DiscountCodeDAO / DiscountCodeDTO | MaGiamGiaBUS / MaGiamGiaDAO / MaGiamGiaQuanLyDTO |
+| ArrayListSearch / SearchConditionDTO | TimKiemArrayList / DieuKienTimKiemDTO |
+| CustomerManagementForm / EmployeeManagementForm / DiscountCodeManagementForm | QuanLyKhachHangForm / QuanLyNhanVienForm / QuanLyMaGiamGiaForm |
+
+Luồng học: GUI đọc control vào DTO → BUS Them/Sua/Xoa kiểm tra luật → DAO chạy SQL parameters → GUI hiển thị kết quả. DocDanhSach/DocTheoMa đọc dữ liệu; TimKiem/TimKiemNangCao lọc ArrayList trong BUS. Tên trường lọc cũ vẫn được nhận bên cạnh tên Việt không dấu. JsonPropertyName giữ tên JSON cũ.
+
+MainForm hiện có chứa bảy mục quản trị trong vùng nội dung chung; Form1 giữ ba tab sân bay/chuyến bay/hạng vé và ListView cha–con. Module khách hàng/nhân viên/mã giảm giá dùng ListViewItem.Tag mang DTO. Trước khi chuyển chức năng, chọn dòng khác, tải lại, tìm kiếm hoặc làm trống form, kiểm tra snapshot và hỏi nếu chưa lưu. Nút thao tác nằm ngoài vùng cuộn của ô nhập.
+
+MaGiamGiaQuanLyDTO phục vụ CRUD cấu hình; MaGiamGiaDTO trong DatVeDTO.cs phục vụ báo giá Booking. Hai trách nhiệm được giữ riêng. SoLuotDaDung chỉ đọc, INSERT không nhận giá trị này, UPDATE không ghi đè. Lệnh UPDATE còn kiểm tra hạn mức với used_count hiện tại trong cùng câu SQL để tránh hạ hạn mức dưới số lượt Booking vừa dùng. Xóa khách hàng/nhân viên/mã giảm giá vẫn chịu khóa ngoại; schema và transaction Booking giữ nguyên.
+
+Chỉ xác nhận kết quả build trong lần tích hợp này. CRUD SQL, hạn mức khi đặt đồng thời, hộp thoại chưa lưu và DPI cần được nghiệm thu riêng; chưa chạy lại các bộ regression.
