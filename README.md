@@ -6,8 +6,8 @@ SqlClient và truy vấn tham số hóa. Identifier nghiệp vụ dùng tiếng 
 
 Hiếu quản lý sân bay, chuyến bay, hạng vé và tìm kiếm ArrayList AND/OR/NOT.
 Phú quản lý khách hàng, nhân viên và mã giảm giá. MainForm dùng một vùng nội dung
-chung cho bảy mục: Tổng quan, Sân bay, Chuyến bay, Hạng vé, Khách hàng, Nhân viên,
-Mã giảm giá. Ba tab của Hiếu và ListView cha–con được giữ; chuyển chức năng
+chung cho Tổng quan, Sân bay, Chuyến bay, Hạng vé, Khách hàng, Nhân viên,
+Mã giảm giá, Vé, Hóa đơn và Thống kê. Ba tab của Hiếu và ListView cha–con được giữ; chuyển chức năng
 phải xác nhận nếu còn thay đổi chưa lưu. Các module Phú dùng ListView và tên Việt hóa.
 Thịnh triển khai tìm/chọn chuyến, báo giá server, đặt vé một chiều/khứ hồi,
 tra cứu và hủy. Đặt/hủy chạy trong transaction, bảo vệ ghế, giá lịch sử và
@@ -35,25 +35,52 @@ Không commit mật khẩu, access key, database backup hoặc cấu hình riên
 
 ## Chuẩn bị database
 
-Với **database mới được nhóm duyệt**, người phụ trách SQL review các script
-trong [Database/](Database/), thực hiện 01 → 02 → 03 → 04; 07 là seed mở rộng
-tùy chọn. Các script gốc có `USE FlightBookingDB` hardcode: đổi tham số `-d`
-không đổi được đích bên trong. Không chạy chúng trên database đang có dữ liệu.
+Ứng dụng demo dùng **FlightBooking_Final**, độc lập với `FlightBookingDB` và
+`FlightBooking_Hieu_ManagementTests`. Bộ script [Database/Final/](Database/Final/)
+chỉ dùng 12 bảng hiện có, gồm `BOOKING_WEB_REQUEST`; chưa thêm chi phí/tham số.
+Không chạy trực tiếp script gốc 01–08: chúng có `USE FlightBookingDB` hardcode.
 
-Booking cần bảng `BOOKING_WEB_REQUEST` cùng constraint/index của
-[08_BookingWebRequest.sql](Database/08_BookingWebRequest.sql). Chỉ người phụ trách
-triển khai vào đúng database sau khi nhóm phê duyệt; ứng dụng không tự sửa schema.
-Không chạy lại seed 04/07 hoặc test ghi vào database chính.
+DBA kiểm tra instance bằng `SELECT @@SERVERNAME`, rồi thay `YOUR_VERIFIED_SERVER_NAME`
+và `-S .` theo máy mình. Script tạo database từ chối nếu đích đã tồn tại; khi lỗi
+phải dừng và khảo sát, không DROP hoặc chạy lại mù quáng.
+
+```powershell
+sqlcmd -S . -E -C -d master -b -Q "SELECT @@SERVERNAME AS ServerName"
+sqlcmd -S . -E -C -d master -b -l 15 -t 120 -i Database/Final/01_CreateAndSchema.sql -v EXPECTED_SERVER="YOUR_VERIFIED_SERVER_NAME" CREATE_APPROVAL="APPROVE_CREATE_FLIGHTBOOKING_FINAL"
+```
+
+Review số lượng demo trước khi seed: 8 sân bay, 25 khách, 7 nhân viên, 6 mã giảm giá,
+43 chuyến, 85 hạng vé, 81 booking/hóa đơn, 141 vé/chi tiết và 41 yêu cầu WEB.
+Chuyến tương lai dùng ngày tương đối; dữ liệu lịch sử có đủ bốn quý năm trước,
+các trạng thái PAID/UNPAID/CANCELLED và hai kênh WEB/COUNTER. Đây là dữ liệu giả
+để trình diễn, không phải bằng chứng chức năng thanh toán đã được kiểm thử.
+
+Chỉ seed **một lần**, sau khi số lượng được duyệt, trên database hoàn toàn rỗng
+và chưa từng sử dụng. Đóng Web/WinForms đang kết nối Final. Toàn bộ seed dùng
+một transaction; file đầu ra có khóa tra cứu demo riêng, chỉ giữ local trong `tmp/`.
+
+```powershell
+New-Item -ItemType Directory -Path tmp -Force | Out-Null
+sqlcmd -S . -E -C -d FlightBooking_Final -b -l 15 -t 120 -i Database/Final/02_SeedDemo.sql -v EXPECTED_SERVER="YOUR_VERIFIED_SERVER_NAME" SEED_APPROVAL="APPROVE_SEED_FLIGHTBOOKING_FINAL_DEMO" SEED_PROFILE="DEMO_8_25_7_6_43_85_81_141" -o tmp/final-demo-lookup.private.txt
+sqlcmd -S . -E -C -d FlightBooking_Final -b -i Database/Final/03_Verify_ReadOnly.sql -v EXPECTED_SERVER="YOUR_VERIFIED_SERVER_NAME"
+```
+
+Không seed lại, không sửa hai database cũ. Script writer
+[04_ProposedWriter_ApprovalRequired.sql](Database/Final/04_ProposedWriter_ApprovalRequired.sql)
+là đề xuất cần duyệt riêng; chưa cấp quyền chỉ vì đã tạo/seed database.
 
 ## Chạy WinForms và website
 
-Trong **mỗi terminal**, thay `YOUR_SQL_SERVER` bằng instance thực tế và chỉ chọn
-database đã được cho phép. Tài khoản Windows hiện tại cần quyền SQL phù hợp.
-Không cần account BookingFlightTest để chạy ứng dụng thông thường.
+Tạo **một file local tại gốc repository** sau khi kiểm tra instance của mình:
 
 ```powershell
-$env:ConnectionStrings__FlightBookingDB = 'Server=YOUR_SQL_SERVER;Database=FlightBookingDB;Integrated Security=True;Encrypt=True;TrustServerCertificate=True'
+Set-Content -Encoding utf8 connection.local.txt 'Server=YOUR_SQL_SERVER;Database=FlightBooking_Final;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;'
+dotnet build FlightBookingSystem.slnx
 ```
+
+File này bị Git ignore, được copy cạnh executable của cả hai ứng dụng khi build
+và không tự đóng gói publish. Máy đã được cấu hình thì chỉ cần chạy ứng dụng;
+không phải đặt lại biến kết nối trong mỗi terminal. Windows account vẫn cần quyền SQL.
 
 Terminal thứ nhất:
 
@@ -61,18 +88,28 @@ Terminal thứ nhất:
 dotnet run --no-build --project src/FlightBooking.WinForms
 ```
 
-Terminal thứ hai, sau khi đặt cùng biến kết nối:
+Terminal thứ hai:
 
 ```powershell
 dotnet run --no-build --no-launch-profile --project src/FlightBooking.Web -- --urls http://127.0.0.1:5087
 ```
 
-Mở http://127.0.0.1:5087/. WinForms ưu tiên biến môi trường; có thể dùng
-`connection.local.txt` cạnh executable làm fallback (file bị Git ignore).
-Web đọc key `ConnectionStrings:FlightBookingDB`. Ví dụ trên dành cho phát triển
-với chứng chỉ tự ký; môi trường triển khai cần chứng chỉ được tin cậy.
-Các DAO quản lý từ develop cũng nhận biến này; `FLIGHTBOOKING_DB_CONNECTION`
-được giữ làm fallback tương thích. WinForms khởi động qua MainForm hiện có.
+Mở http://127.0.0.1:5087/. Nếu chạy Web bằng profile mặc định thì URL là
+http://localhost:5191 (xem launchSettings). WinForms khởi động qua MainForm hiện có.
+
+Thứ tự ưu tiên: WinForms/DAO dùng `ConnectionStrings__FlightBookingDB`, rồi
+`FLIGHTBOOKING_DB_CONNECTION`, rồi file local cạnh executable. Web giữ cấu hình
+ASP.NET cho key `ConnectionStrings:FlightBookingDB` (command line, biến môi trường,
+appsettings theo thứ tự framework); nếu key chưa có mới dùng cấu hình MyConnection
+chung. Giá trị key rỗng tường minh vẫn báo lỗi, không tự chuyển sang database khác.
+Kiểm tra/xóa override cũ trong terminal trước khi chạy nếu còn trỏ database test/main.
+Không đổi key, không ghi connection string vào DAO hoặc commit cấu hình cá nhân.
+
+Để đo kết nối thật, bật `$env:FLIGHTBOOKING_CONNECTION_DIAGNOSTICS='1'`, chạy ứng dụng
+và mở chức năng đọc. MyConnection thực hiện `SELECT @@SERVERNAME,DB_NAME(),ORIGINAL_LOGIN()`
+trên kết nối vừa mở và in `SQL_IDENTITY` (không in password/access key). Cả hai ứng dụng
+phải báo `Database=FlightBooking_Final`. Sau khi kiểm tra có thể bỏ biến chẩn đoán.
+Ví dụ trên dùng chứng chỉ tự ký cho local; triển khai cần chứng chỉ được tin cậy.
 
 Thử: tạo chuyến/hạng → Web tìm/chọn → nhập người đặt và từng hành khách →
 tính lại giá → xác nhận → lưu mã/khóa riêng → tra cứu/hủy → WinForms **Tải lại**.
@@ -101,9 +138,9 @@ chạy runner. Không dùng sysadmin thay writer, không bỏ guard, không seed
 Kiểm tra chỉ đọc trên database test đã xác minh:
 
 ```powershell
-$env:FLIGHTBOOKING_BROWSE_CONNECTION = $env:ConnectionStrings__FlightBookingDB
+$env:FLIGHTBOOKING_BROWSE_CONNECTION = 'Server=YOUR_SQL_SERVER;Database=FlightBooking_Hieu_ManagementTests;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;'
 dotnet run --no-build --project tests/FlightBooking.Checks -- --connection-settings
-$env:FLIGHTBOOKING_UI_READ_CONNECTION = $env:ConnectionStrings__FlightBookingDB
+$env:FLIGHTBOOKING_UI_READ_CONNECTION = $env:FLIGHTBOOKING_BROWSE_CONNECTION
 dotnet run --no-build --project tests/FlightBooking.WinFormsChecks -- --interaction --layout
 & tests/FlightBooking.Checks/readonly.http.ps1 -BaseUrl http://127.0.0.1:5087
 ```
@@ -112,6 +149,8 @@ Các lệnh này cần kết nối test và Web tương ứng; HTTP readonly ch�
 không đặt/hủy. Các script HTTP demo cũ có ID/ngày cố định, cần đối chiếu dữ liệu
 trước khi dùng. GUI automation không thay nghiệm thu CRUD bằng chuột, Esc vật lý
 hoặc DPI Windows 125%/150%; không tự đổi thiết lập màn hình để chạy test.
+Các runner SQL hiện vẫn chỉ chấp nhận database test cũ; không trỏ chúng vào Final,
+không đổi marker/whitelist để chạy được và không dùng sysadmin thay writer.
 
 ## Cấu trúc
 
@@ -122,7 +161,7 @@ hoặc DPI Windows 125%/150%; không tự đổi thiết lập màn hình để 
 | [FlightBooking.BUS](src/FlightBooking.BUS/) | QuanLyBUS, TimKiemQuanLy, DatVeBUS; validation và nghiệp vụ. |
 | [FlightBooking.WinForms](src/FlightBooking.WinForms/) | Ba tab quản lý, ListView cha–con, editor và hộp thoại chọn. |
 | [FlightBooking.Web](src/FlightBooking.Web/) | Razor Pages tìm/đặt/tra cứu/hủy, session và antiforgery. |
-| [Database](Database/) | 8 script chính thức của nhóm và TestPlan có guard. |
+| [Database](Database/) | Script gốc của nhóm, bộ triển khai Final độc lập và TestPlan có guard riêng. |
 | [tests](tests/) | C#, WinForms, HTTP, JavaScript và preflight/policy dùng chung. |
 | [Docs](Docs/) | [ERD chung](Docs/flight_booking_erd_source.drawio) và tài liệu nghiệp vụ của các thành viên được giữ theo quyền sở hữu. |
 

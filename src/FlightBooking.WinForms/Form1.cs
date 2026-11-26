@@ -15,11 +15,7 @@ public partial class Form1 : Form
         var vungLamViec = Screen.FromPoint(Cursor.Position).WorkingArea;
         Bounds = GiaoDien.KichThuocCuaSo(vungLamViec, new Size(1340, 840));
         MinimumSize = new Size(Math.Min(1040, vungLamViec.Width - 24), Math.Min(640, vungLamViec.Height - 24));
-        var ketNoi = Environment.GetEnvironmentVariable("ConnectionStrings__FlightBookingDB");
-        if (string.IsNullOrWhiteSpace(ketNoi))
-            ketNoi = Environment.GetEnvironmentVariable("FLIGHTBOOKING_DB_CONNECTION");
-        var duongDan = Path.Combine(AppContext.BaseDirectory, "connection.local.txt");
-        if (string.IsNullOrWhiteSpace(ketNoi) && File.Exists(duongDan)) ketNoi = File.ReadAllText(duongDan).Trim();
+        var ketNoi = FlightBooking.DAO.MyConnection.DocChuoiKetNoi();
         var nghiepVu = new FlightBooking.BUS.QuanLyBUS(ketNoi ?? "");
         cacThe = new TabControl { Dock = DockStyle.Fill, Padding = new Point(22, 10), Font = Font };
         var sanBay = new TrangQuanLy(nghiepVu, LoaiDanhMuc.SanBay);

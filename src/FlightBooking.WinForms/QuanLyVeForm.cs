@@ -43,7 +43,7 @@ public sealed class QuanLyVeForm : Form
     private readonly Button nutTimKiem = TaoNut("Tìm kiếm");
     private readonly Button nutTaiLai = TaoNut("Tải lại");
     private readonly Button nutXuatExcel = TaoNut("Xuất Excel");
-    private readonly Button nutHuyVe = TaoNut("Hủy vé", canhBao: true);
+    private readonly Button nutHuyVe = TaoNut("Hủy đơn chứa vé", canhBao: true);
     private readonly Button nutLamTrong = TaoNut("Bỏ chọn");
 
     public QuanLyVeForm()
@@ -228,7 +228,7 @@ public sealed class QuanLyVeForm : Form
                 XoaChiTiet();
         };
 
-        nutHuyVe.Click += (_, _) => ThucHienHuyVe();
+        nutHuyVe.Click += (_, _) => ThucHienHuyDonChuaVe();
         nutXuatExcel.Click += (_, _) => ThucHienXuatExcel();
     }
 
@@ -280,7 +280,7 @@ public sealed class QuanLyVeForm : Form
                 dong.SubItems.Add(tuyen);
                 dong.SubItems.Add(ve.SoGhe);
                 dong.SubItems.Add(ve.TenHangVe);
-                dong.SubItems.Add(ve.GiaVe.ToString("N0"));
+                dong.SubItems.Add(ve.CoGiaLichSu ? ve.GiaVe.ToString("N2") : "Chưa có chứng từ");
                 dong.SubItems.Add(string.IsNullOrEmpty(ve.TenHanhKhach) ? "(Chưa rõ)" : ve.TenHanhKhach);
                 dong.SubItems.Add(ve.TrangThai == "ISSUED" ? "Hiệu lực" : "Đã hủy");
                 dong.SubItems.Add(ve.NgayPhatHanh.ToString("dd/MM/yyyy HH:mm"));
@@ -296,6 +296,7 @@ public sealed class QuanLyVeForm : Form
         {
             danhSach.EndUpdate();
         }
+        GiaoDien.CanCotDanhSach(danhSach);
         XoaChiTiet();
     }
 
@@ -306,14 +307,14 @@ public sealed class QuanLyVeForm : Form
         oTuyenBay.Text = !string.IsNullOrEmpty(ve.SanBayDi) ? $"{ve.SanBayDi} → {ve.SanBayDen}" : $"Chuyến #{ve.MaChuyenBay}";
         oSoGhe.Text = ve.SoGhe;
         oHangVe.Text = ve.TenHangVe;
-        oGiaVe.Text = ve.GiaVe.ToString("N0") + " VNĐ";
+        oGiaVe.Text = ve.CoGiaLichSu ? ve.GiaVe.ToString("N2") + " VNĐ" : "Chưa có chứng từ giá lịch sử";
         oHanhKhach.Text = ve.TenHanhKhach;
         oSoGiayTo.Text = ve.SoGiayTo;
         oTrangThai.Text = ve.TrangThai == "ISSUED" ? "ISSUED (Có hiệu lực)" : "CANCELLED (Đã hủy)";
         oTrangThai.ForeColor = ve.TrangThai == "ISSUED" ? Color.Green : GiaoDien.MauLoi;
         oNgayPhatHanh.Text = ve.NgayPhatHanh.ToString("dd/MM/yyyy HH:mm:ss");
 
-        nutHuyVe.Enabled = ve.TrangThai == "ISSUED";
+        nutHuyVe.Enabled = ve.TrangThai == "ISSUED" && ve.TrangThaiHoaDon == "UNPAID" && ve.MaDatVe.HasValue;
     }
 
     private void XoaChiTiet()
@@ -332,7 +333,7 @@ public sealed class QuanLyVeForm : Form
         nutHuyVe.Enabled = false;
     }
 
-    private void ThucHienHuyVe()
+    private void ThucHienHuyDonChuaVe()
     {
         if (danhSach.SelectedItems.Count == 0 || danhSach.SelectedItems[0].Tag is not VeMayBayDTO ve)
         {
@@ -347,21 +348,21 @@ public sealed class QuanLyVeForm : Form
         }
 
         var xacNhan = MessageBox.Show(this,
-            $"Bạn có chắc chắn muốn hủy vé #{ve.MaVe} (Ghế {ve.SoGhe} - Khách {ve.TenHanhKhach})?\nGhế sẽ được hoàn trả lại cho chuyến bay.",
+            $"Hủy toàn bộ đơn #{ve.MaDatVe} chứa vé #{ve.MaVe}?\nChỉ áp dụng đơn UNPAID trước giờ bay. Tất cả vé thuộc đơn sẽ bị hủy, hoàn ghế và lượt mã giảm giá đúng một lần.",
             "Xác nhận hủy vé", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
 
         if (xacNhan != DialogResult.Yes) return;
 
         try
         {
-            string? loi = bus.HuyVe(ve.MaVe);
+            string? loi = bus.HuyDonChuaVe(ve.MaVe);
             if (loi != null)
             {
                 MessageBox.Show(this, loi, "Lỗi hủy vé", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            MessageBox.Show(this, $"Đã hủy thành công vé #{ve.MaVe}.", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, $"Đã hủy đơn chứa vé #{ve.MaVe}.", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
             TaiDanhSach();
         }
         catch (Exception ex)
@@ -374,8 +375,8 @@ public sealed class QuanLyVeForm : Form
     {
         using var sfd = new SaveFileDialog
         {
-            Filter = "Tệp Excel CSV (*.csv)|*.csv",
-            FileName = $"DanhSachVe_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+            Filter = "Excel 97–2003 (*.xls)|*.xls",
+            FileName = $"DanhSachVe_{DateTime.Now:yyyyMMdd_HHmmss}.xls"
         };
         if (sfd.ShowDialog(this) == DialogResult.OK)
         {

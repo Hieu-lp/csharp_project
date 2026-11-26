@@ -47,6 +47,11 @@ public class HoaDonDTO
     [JsonPropertyName("TicketCount")]
     public int SoLuongVe { get; set; }
 
+    [JsonPropertyName("EmployeeId")]
+    public int? MaNhanVien { get; set; }
+    [JsonPropertyName("EmployeeName")]
+    public string TenNhanVien { get; set; } = "";
+
     [JsonPropertyName("Details")]
     public List<ChiTietHoaDonDTO> DanhSachChiTiet { get; set; } = new();
 }

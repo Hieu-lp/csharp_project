@@ -27,8 +27,11 @@ public sealed class MainForm : Form
     {
         var khungChinh = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
-            Margin = Padding.Empty, Padding = Padding.Empty
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
         };
         khungChinh.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 200));
         khungChinh.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -42,18 +45,25 @@ public sealed class MainForm : Form
     {
         var thanhBen = new Panel
         {
-            Dock = DockStyle.Fill, AutoScroll = true,
-            Padding = new Padding(12), BackColor = Color.FromArgb(30, 41, 59)
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            Padding = new Padding(12),
+            BackColor = Color.FromArgb(30, 41, 59)
         };
         var danhSachNut = new FlowLayoutPanel
         {
-            Dock = DockStyle.Top, FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, AutoSize = true
+            Dock = DockStyle.Top,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoSize = true
         };
         danhSachNut.Controls.Add(new Label
         {
-            AutoSize = true, Text = "FLIGHTBOOKING", ForeColor = Color.White,
-            Font = new Font("Segoe UI", 12F, FontStyle.Bold), Margin = new Padding(4, 10, 4, 24)
+            AutoSize = true,
+            Text = "FLIGHTBOOKING",
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+            Margin = new Padding(4, 10, 4, 14)
         });
         ThemNutDieuHuong(danhSachNut, "Tổng quan", HienThiTongQuan);
         ThemNutDieuHuong(danhSachNut, "Sân bay", () => MoQuanLyChuyenBay(LoaiDanhMuc.SanBay, "Sân bay"));
@@ -76,12 +86,18 @@ public sealed class MainForm : Form
     {
         var nut = new Button
         {
-            Text = ten, Width = 172, Height = 44, TextAlign = ContentAlignment.MiddleLeft,
-            FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(30, 41, 59),
-            ForeColor = Color.White, Margin = new Padding(0, 0, 0, 8), Padding = new Padding(10, 0, 4, 0)
+            Text = ten,
+            Width = 168,
+            Height = 38,
+            TextAlign = ContentAlignment.MiddleLeft,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(30, 41, 59),
+            ForeColor = Color.White,
+            Margin = new Padding(0, 0, 0, 6),
+            Padding = new Padding(10, 0, 4, 0)
         };
         nut.FlatAppearance.BorderSize = 0;
-        nut.FlatAppearance.MouseOverBackColor = Color.FromArgb(51, 65, 85);
+        nut.FlatAppearance.MouseOverBackColor = Color.FromArgb(29, 78, 216);
         nut.Click += (_, _) => xuLy();
         cacNut.Add(ten, nut);
         danhSach.Controls.Add(nut);
@@ -110,7 +126,9 @@ public sealed class MainForm : Form
         var manHinh = new Form1();
         manHinh.TrangDaChon += trang => DanhDauMuc(trang switch
         {
-            LoaiDanhMuc.SanBay => "Sân bay", LoaiDanhMuc.ChuyenBay => "Chuyến bay", _ => "Hạng vé"
+            LoaiDanhMuc.SanBay => "Sân bay",
+            LoaiDanhMuc.ChuyenBay => "Chuyến bay",
+            _ => "Hạng vé"
         });
         // Chọn tab khi form chưa hiện để việc tải tab đầu không chặn điều hướng.
         manHinh.ChonTrang(loai);
@@ -145,7 +163,8 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             Text = "HỆ THỐNG QUẢN LÝ ĐẶT VÉ MÁY BAY\n\nChọn chức năng ở thanh điều hướng để bắt đầu.",
-            TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 16F),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = new Font("Segoe UI", 16F),
             ForeColor = GiaoDien.MauChu
         });
         DanhDauMuc("Tổng quan");

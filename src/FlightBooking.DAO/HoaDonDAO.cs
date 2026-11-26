@@ -11,11 +11,12 @@ public class HoaDonDAO
 {
     private const string TruyVanHoaDon = """
         SELECT i.invoice_id, i.booking_id, i.invoice_date, i.total, i.discount_amount, i.tax_amount, i.total_amount, i.status,
-               b.flight_id, b.ticket_quantity,
+               b.flight_id, b.ticket_quantity,b.employee_id,e.full_name AS employee_name,
                c.full_name AS customer_name, c.phone AS customer_phone, c.email AS customer_email
         FROM dbo.INVOICE i
         JOIN dbo.BOOKING b ON i.booking_id = b.booking_id
         JOIN dbo.CUSTOMER c ON b.customer_id = c.customer_id
+        LEFT JOIN dbo.EMPLOYEE e ON e.employee_id=b.employee_id
         """;
 
     public List<HoaDonDTO> DocDSHoaDon()
@@ -39,7 +40,8 @@ public class HoaDonDAO
         lenhSQL.Parameters.Add("@id", SqlDbType.Int).Value = maHoaDon;
         ketNoi.Open();
         using SqlDataReader doc = lenhSQL.ExecuteReader();
-        if (!doc.Read()) return null;
+        if (!doc.Read())
+            return null;
         var hoaDon = ChuyenDoiHoaDon(doc);
         doc.Close();
 
@@ -67,7 +69,8 @@ public class HoaDonDAO
 
         try
         {
-            if (taoMoiKetNoi) ketNoi.Open();
+            if (taoMoiKetNoi)
+                ketNoi.Open();
             using var lenhSQL = new SqlCommand(sqlChiTiet, ketNoi);
             lenhSQL.Parameters.Add("@invoiceId", SqlDbType.Int).Value = maHoaDon;
             using SqlDataReader doc = lenhSQL.ExecuteReader();
@@ -90,276 +93,109 @@ public class HoaDonDAO
         }
         finally
         {
-            if (taoMoiKetNoi) ketNoi.Dispose();
+            if (taoMoiKetNoi)
+                ketNoi.Dispose();
         }
 
         return ketQua;
     }
 
-    public bool ThanhToanHoaDon(int maHoaDon)
+    private static (int MaDatVe, int MaChuyenBay, string? MaBam)? DocDanhTinh(SqlConnection ketNoi, int maHoaDon)
+    {
+        using var lenhSQL = new SqlCommand("""
+            SELECT b.booking_id,b.flight_id,w.request_hash FROM dbo.INVOICE i
+            JOIN dbo.BOOKING b ON b.booking_id=i.booking_id
+            LEFT JOIN dbo.BOOKING_WEB_REQUEST w ON w.booking_id=b.booking_id
+            WHERE i.invoice_id=@id
+            """, ketNoi);
+        lenhSQL.Parameters.Add("@id", SqlDbType.Int).Value = maHoaDon;
+        using var docDuLieu = lenhSQL.ExecuteReader();
+        if (!docDuLieu.Read())
+            return null;
+        return (docDuLieu.GetInt32(0), docDuLieu.GetInt32(1), docDuLieu.IsDBNull(2) ? null : docDuLieu.GetString(2));
+    }
+
+    public bool ThanhToanHoaDon(int maHoaDon, decimal? soTienDaXacNhan = null)
     {
         using SqlConnection ketNoi = MyConnection.CreateConnection();
         ketNoi.Open();
+        var danhTinh = DocDanhTinh(ketNoi, maHoaDon);
+        if (danhTinh is null)
+            return false;
         using SqlTransaction giaoDich = ketNoi.BeginTransaction(IsolationLevel.Serializable);
+        var duLieu = new DuLieuDatVe(ketNoi, giaoDich);
+        // Cùng thứ tự khóa với website: yêu cầu -> chuyến -> Booking -> Invoice.
+        if (danhTinh.Value.MaBam is string maBam)
+            duLieu.KhoaYeuCau(maBam);
+        duLieu.DocChuyenBay(danhTinh.Value.MaChuyenBay, true);
+        DatVeDTO? datVe = duLieu.DocDatVeQuanTri(danhTinh.Value.MaDatVe, true);
+        if (datVe is null || datVe.MaChuyenBay != danhTinh.Value.MaChuyenBay ||
+            datVe.TrangThai != "CONFIRMED" || datVe.TrangThaiHoaDon != "UNPAID")
+            return false;
 
-        try
-        {
-            // 1. Kiểm tra hóa đơn hiện tại và lấy thông tin
-            using var cmdCheck = new SqlCommand("""
-                SELECT i.status, i.total_amount, b.flight_id
-                FROM dbo.INVOICE i WITH (UPDLOCK, HOLDLOCK)
-                JOIN dbo.BOOKING b ON i.booking_id = b.booking_id
-                WHERE i.invoice_id = @id;
-                """, ketNoi, giaoDich);
-            cmdCheck.Parameters.Add("@id", SqlDbType.Int).Value = maHoaDon;
-
-            string trangThai = "";
-            decimal tongTien = 0;
-            int maChuyenBay = 0;
-
-            using (var reader = cmdCheck.ExecuteReader())
-            {
-                if (!reader.Read()) return false;
-                trangThai = reader.GetString(0).Trim();
-                tongTien = reader.GetDecimal(1);
-                maChuyenBay = reader.GetInt32(2);
-            }
-
-            if (trangThai != "UNPAID")
-                return false; // Chỉ hóa đơn UNPAID mới được thanh toán
-
-            // 2. Chuyển trạng thái sang PAID
-            using var cmdUpdateInvoice = new SqlCommand("""
-                UPDATE dbo.INVOICE SET status = 'PAID' WHERE invoice_id = @id AND status = 'UNPAID';
-                """, ketNoi, giaoDich);
-            cmdUpdateInvoice.Parameters.Add("@id", SqlDbType.Int).Value = maHoaDon;
-            if (cmdUpdateInvoice.ExecuteNonQuery() != 1) return false;
-
-            // 3. Cập nhật doanh thu chuyến bay FLIGHT.total_revenue
-            using var cmdUpdateFlight = new SqlCommand("""
-                UPDATE dbo.FLIGHT
-                SET total_revenue = total_revenue + @amount
-                WHERE flight_id = @flightId;
-                """, ketNoi, giaoDich);
-            cmdUpdateFlight.Parameters.Add("@amount", SqlDbType.Decimal).Value = tongTien;
-            cmdUpdateFlight.Parameters.Add("@flightId", SqlDbType.Int).Value = maChuyenBay;
-            cmdUpdateFlight.ExecuteNonQuery();
-
-            giaoDich.Commit();
-            return true;
-        }
-        catch
-        {
-            giaoDich.Rollback();
-            throw;
-        }
+        // Đối chiếu chứng từ và vé hiệu lực trước khi nhận tiền; không tính lại giá hiện tại.
+        using var kiemTra = new SqlCommand("""
+            SELECT i.total_amount FROM dbo.INVOICE i WITH(UPDLOCK,HOLDLOCK)
+            JOIN dbo.BOOKING b ON b.booking_id=i.booking_id
+            WHERE i.invoice_id=@id AND i.booking_id=@booking AND i.status='UNPAID'
+              AND b.status='CONFIRMED' AND b.total_amount=i.total_amount
+              AND i.total_amount=i.total-i.discount_amount+i.tax_amount
+              AND i.total=COALESCE((SELECT SUM(d.subtotal) FROM dbo.INVOICE_DETAIL d WHERE d.invoice_id=i.invoice_id),0)
+              AND b.ticket_quantity=(SELECT COUNT(*) FROM dbo.INVOICE_DETAIL d WHERE d.invoice_id=i.invoice_id)
+              AND b.ticket_quantity=(SELECT COUNT(*) FROM dbo.BOOKING_DETAIL bd JOIN dbo.TICKET t ON t.ticket_id=bd.ticket_id
+                  JOIN dbo.INVOICE_DETAIL d ON d.ticket_id=t.ticket_id AND d.invoice_id=i.invoice_id
+                  WHERE bd.booking_id=b.booking_id AND t.flight_id=b.flight_id AND t.status='ISSUED'
+                    AND bd.price=d.unit_price AND d.subtotal=d.unit_price AND d.quantity=1)
+            """, ketNoi, giaoDich);
+        kiemTra.Parameters.Add("@id", SqlDbType.Int).Value = maHoaDon;
+        kiemTra.Parameters.Add("@booking", SqlDbType.Int).Value = datVe.MaDatVe;
+        object? soTien = kiemTra.ExecuteScalar();
+        if (soTien is null || soTien is DBNull)
+            throw new LoiDatVe("Chứng từ hoặc số vé không khớp. Chưa ghi nhận thanh toán; hãy tải lại và kiểm tra.");
+        if (soTienDaXacNhan.HasValue && soTienDaXacNhan.Value != (decimal)soTien)
+            throw new LoiDatVe("Số tiền hóa đơn vừa thay đổi. Chưa ghi nhận thanh toán; hãy tải lại và xác nhận.");
+        using var capNhat = new SqlCommand("UPDATE dbo.INVOICE SET status='PAID' WHERE invoice_id=@id AND status='UNPAID'", ketNoi, giaoDich);
+        capNhat.Parameters.Add("@id", SqlDbType.Int).Value = maHoaDon;
+        if (capNhat.ExecuteNonQuery() != 1)
+            return false;
+        using var doanhThu = new SqlCommand("UPDATE dbo.FLIGHT SET total_revenue=total_revenue+@amount WHERE flight_id=@flight", ketNoi, giaoDich);
+        SqlParameter tien = doanhThu.Parameters.Add("@amount", SqlDbType.Decimal);
+        tien.Precision = 18;
+        tien.Scale = 2;
+        tien.Value = (decimal)soTien;
+        doanhThu.Parameters.Add("@flight", SqlDbType.Int).Value = datVe.MaChuyenBay;
+        if (doanhThu.ExecuteNonQuery() != 1)
+            throw new LoiDatVe("Không cập nhật được doanh thu chuyến bay. Thanh toán đã được hoàn tác.");
+        giaoDich.Commit();
+        return true;
+        // Dispose giao dịch chưa commit sẽ rollback và giữ exception gốc.
     }
 
     public bool HuyHoaDon(int maHoaDon)
     {
         using SqlConnection ketNoi = MyConnection.CreateConnection();
         ketNoi.Open();
+        var danhTinh = DocDanhTinh(ketNoi, maHoaDon);
+        if (danhTinh is null)
+            return false;
         using SqlTransaction giaoDich = ketNoi.BeginTransaction(IsolationLevel.Serializable);
-
-        try
-        {
-            // 1. Lấy thông tin hóa đơn và booking
-            using var cmdCheck = new SqlCommand("""
-                SELECT i.status, i.booking_id, b.flight_id, b.ticket_quantity, b.discount_id
-                FROM dbo.INVOICE i WITH (UPDLOCK, HOLDLOCK)
-                JOIN dbo.BOOKING b WITH (UPDLOCK, HOLDLOCK) ON i.booking_id = b.booking_id
-                WHERE i.invoice_id = @id;
-                """, ketNoi, giaoDich);
-            cmdCheck.Parameters.Add("@id", SqlDbType.Int).Value = maHoaDon;
-
-            string trangThai = "";
-            int maDatVe = 0, maChuyenBay = 0, soLuongVe = 0;
-            int? maGiamGia = null;
-
-            using (var reader = cmdCheck.ExecuteReader())
-            {
-                if (!reader.Read()) return false;
-                trangThai = reader.GetString(0).Trim();
-                maDatVe = reader.GetInt32(1);
-                maChuyenBay = reader.GetInt32(2);
-                soLuongVe = reader.GetInt32(3);
-                if (!reader.IsDBNull(4)) maGiamGia = reader.GetInt32(4);
-            }
-
-            if (trangThai == "CANCELLED") return true;
-            if (trangThai == "PAID")
-            {
-                // Nếu hóa đơn đã PAID mà hủy, cần trừ lại total_revenue của chuyến bay
-                using var cmdSubRevenue = new SqlCommand("""
-                    UPDATE dbo.FLIGHT SET total_revenue = CASE WHEN total_revenue >= i.total_amount THEN total_revenue - i.total_amount ELSE 0 END
-                    FROM dbo.FLIGHT f
-                    JOIN dbo.BOOKING b ON f.flight_id = b.flight_id
-                    JOIN dbo.INVOICE i ON b.booking_id = i.booking_id
-                    WHERE i.invoice_id = @id;
-                    """, ketNoi, giaoDich);
-                cmdSubRevenue.Parameters.Add("@id", SqlDbType.Int).Value = maHoaDon;
-                cmdSubRevenue.ExecuteNonQuery();
-            }
-
-            // 2. Chuyển trạng thái Invoice sang CANCELLED
-            using var cmdUpdateInvoice = new SqlCommand("""
-                UPDATE dbo.INVOICE SET status = 'CANCELLED' WHERE invoice_id = @id;
-                """, ketNoi, giaoDich);
-            cmdUpdateInvoice.Parameters.Add("@id", SqlDbType.Int).Value = maHoaDon;
-            cmdUpdateInvoice.ExecuteNonQuery();
-
-            // 3. Chuyển trạng thái Booking sang CANCELLED
-            using var cmdUpdateBooking = new SqlCommand("""
-                UPDATE dbo.BOOKING SET status = 'CANCELLED' WHERE booking_id = @bookingId;
-                """, ketNoi, giaoDich);
-            cmdUpdateBooking.Parameters.Add("@bookingId", SqlDbType.Int).Value = maDatVe;
-            cmdUpdateBooking.ExecuteNonQuery();
-
-            // 4. Hủy các vé TICKET thuộc booking này
-            using var cmdUpdateTickets = new SqlCommand("""
-                UPDATE t
-                SET t.status = 'CANCELLED'
-                FROM dbo.TICKET t
-                JOIN dbo.BOOKING_DETAIL bd ON t.ticket_id = bd.ticket_id
-                WHERE bd.booking_id = @bookingId AND t.status = 'ISSUED';
-                """, ketNoi, giaoDich);
-            cmdUpdateTickets.Parameters.Add("@bookingId", SqlDbType.Int).Value = maDatVe;
-            cmdUpdateTickets.ExecuteNonQuery();
-
-            // 5. Hoàn số ghế cho chuyến bay
-            using var cmdRestoreSeats = new SqlCommand("""
-                UPDATE dbo.FLIGHT
-                SET seats_available = seats_available + @qty,
-                    tickets_sold = CASE WHEN tickets_sold >= @qty THEN tickets_sold - @qty ELSE 0 END
-                WHERE flight_id = @flightId;
-                """, ketNoi, giaoDich);
-            cmdRestoreSeats.Parameters.Add("@qty", SqlDbType.Int).Value = soLuongVe;
-            cmdRestoreSeats.Parameters.Add("@flightId", SqlDbType.Int).Value = maChuyenBay;
-            cmdRestoreSeats.ExecuteNonQuery();
-
-            // 6. Hoàn mã giảm giá nếu có
-            if (maGiamGia.HasValue)
-            {
-                using var cmdRestoreDiscount = new SqlCommand("""
-                    UPDATE dbo.DISCOUNT_CODE
-                    SET used_count = CASE WHEN used_count > 0 THEN used_count - 1 ELSE 0 END
-                    WHERE discount_id = @discountId;
-                    """, ketNoi, giaoDich);
-                cmdRestoreDiscount.Parameters.Add("@discountId", SqlDbType.Int).Value = maGiamGia.Value;
-                cmdRestoreDiscount.ExecuteNonQuery();
-            }
-
-            giaoDich.Commit();
+        var duLieu = new DuLieuDatVe(ketNoi, giaoDich);
+        if (danhTinh.Value.MaBam is string maBam)
+            duLieu.KhoaYeuCau(maBam);
+        duLieu.DocChuyenBay(danhTinh.Value.MaChuyenBay, true);
+        DatVeDTO? datVe = duLieu.DocDatVeQuanTri(danhTinh.Value.MaDatVe, true);
+        if (datVe is null || datVe.MaChuyenBay != danhTinh.Value.MaChuyenBay)
+            return false;
+        if (datVe.TrangThai == "CANCELLED" && datVe.TrangThaiHoaDon == "CANCELLED")
             return true;
-        }
-        catch
-        {
-            giaoDich.Rollback();
-            throw;
-        }
-    }
-
-    public ThongKeDoanhThuDTO ThongKeTongHop()
-    {
-        var ketQua = new ThongKeDoanhThuDTO();
-        using SqlConnection ketNoi = MyConnection.CreateConnection();
-        ketNoi.Open();
-
-        // 1. Thống kê chung theo hóa đơn
-        const string sqlTongHop = """
-            SELECT 
-                ISNULL(SUM(CASE WHEN status = 'PAID' THEN total_amount ELSE 0 END), 0) AS PaidRevenue,
-                ISNULL(SUM(CASE WHEN status = 'UNPAID' THEN total_amount ELSE 0 END), 0) AS UnpaidRevenue,
-                ISNULL(SUM(CASE WHEN status != 'CANCELLED' THEN total_amount ELSE 0 END), 0) AS TotalRevenue,
-                COUNT(*) AS TotalInvoices,
-                ISNULL(SUM(CASE WHEN status = 'PAID' THEN 1 ELSE 0 END), 0) AS PaidCount,
-                ISNULL(SUM(CASE WHEN status = 'UNPAID' THEN 1 ELSE 0 END), 0) AS UnpaidCount,
-                ISNULL(SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END), 0) AS CancelledCount
-            FROM dbo.INVOICE;
-            """;
-
-        using (var cmd = new SqlCommand(sqlTongHop, ketNoi))
-        using (var reader = cmd.ExecuteReader())
-        {
-            if (reader.Read())
-            {
-                ketQua.DoanhThuDaThu = reader.GetDecimal(0);
-                ketQua.DoanhThuChuaThu = reader.GetDecimal(1);
-                ketQua.TongDoanhThu = reader.GetDecimal(2);
-                ketQua.TongSoHoaDon = reader.GetInt32(3);
-                ketQua.SoHoaDonDaThanhToan = reader.GetInt32(4);
-                ketQua.SoHoaDonChuaThanhToan = reader.GetInt32(5);
-                ketQua.SoHoaDonDaHuy = reader.GetInt32(6);
-            }
-        }
-
-        // 2. Tổng số vé đã bán
-        const string sqlVe = "SELECT COUNT(*) FROM dbo.TICKET WHERE status = 'ISSUED';";
-        using (var cmd = new SqlCommand(sqlVe, ketNoi))
-        {
-            ketQua.TongSoVeBan = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
-        }
-
-        // 3. Doanh thu theo quý
-        const string sqlQuy = """
-            SELECT 
-                YEAR(invoice_date) AS [Year],
-                DATEPART(QUARTER, invoice_date) AS [Quarter],
-                COUNT(*) AS InvoiceCount,
-                ISNULL(SUM(b.ticket_quantity), 0) AS TicketCount,
-                ISNULL(SUM(i.total_amount), 0) AS Revenue
-            FROM dbo.INVOICE i
-            JOIN dbo.BOOKING b ON i.booking_id = b.booking_id
-            WHERE i.status = 'PAID'
-            GROUP BY YEAR(invoice_date), DATEPART(QUARTER, invoice_date)
-            ORDER BY [Year] DESC, [Quarter] DESC;
-            """;
-
-        using (var cmd = new SqlCommand(sqlQuy, ketNoi))
-        using (var reader = cmd.ExecuteReader())
-        {
-            while (reader.Read())
-            {
-                ketQua.DoanhThuTheoQuy.Add(new DoanhThuTheoQuyDTO
-                {
-                    Nam = reader.GetInt32(0),
-                    Quy = reader.GetInt32(1),
-                    SoHoaDon = reader.GetInt32(2),
-                    SoVe = reader.GetInt32(3),
-                    DoanhThu = reader.GetDecimal(4)
-                });
-            }
-        }
-
-        // 4. Doanh thu theo chuyến bay
-        const string sqlChuyenBay = """
-            SELECT 
-                f.flight_id,
-                dep.city + ' - ' + arr.city AS Route,
-                f.tickets_sold,
-                f.total_revenue
-            FROM dbo.FLIGHT f
-            JOIN dbo.AIRPORT dep ON f.departure_airport_id = dep.airport_id
-            JOIN dbo.AIRPORT arr ON f.arrival_airport_id = arr.airport_id
-            ORDER BY f.total_revenue DESC, f.flight_id;
-            """;
-
-        using (var cmd = new SqlCommand(sqlChuyenBay, ketNoi))
-        using (var reader = cmd.ExecuteReader())
-        {
-            while (reader.Read())
-            {
-                ketQua.DoanhThuTheoChuyenBay.Add(new DoanhThuTheoChuyenBayDTO
-                {
-                    MaChuyenBay = reader.GetInt32(0),
-                    TuyenBay = reader.GetString(1),
-                    SoVeDaBan = reader.GetInt32(2),
-                    DoanhThu = reader.GetDecimal(3)
-                });
-            }
-        }
-
-        return ketQua;
+        if (datVe.TrangThai != "CONFIRMED" || datVe.TrangThaiHoaDon != "UNPAID")
+            throw new LoiDatVe("Chỉ hủy đơn chưa thanh toán. Hoàn tiền đơn PAID cần quy trình riêng được nhóm phê duyệt.");
+        if (datVe.ChuyenBay.ThoiDiemKhoiHanh <= DateTime.Now)
+            throw new LoiDatVe("Không hủy sau giờ khởi hành.");
+        // Dùng đúng luồng hủy Booking hiện có: hóa đơn, toàn bộ vé, ghế và mã giảm giá cùng giao dịch.
+        duLieu.HuyDatVe(datVe);
+        giaoDich.Commit();
+        return true;
     }
 
     private static HoaDonDTO ChuyenDoiHoaDon(SqlDataReader doc)
@@ -376,6 +212,8 @@ public class HoaDonDAO
             TrangThai = doc.GetString(doc.GetOrdinal("status")).Trim(),
             MaChuyenBay = doc.GetInt32(doc.GetOrdinal("flight_id")),
             SoLuongVe = doc.GetInt32(doc.GetOrdinal("ticket_quantity")),
+            MaNhanVien = doc.IsDBNull(doc.GetOrdinal("employee_id")) ? null : doc.GetInt32(doc.GetOrdinal("employee_id")),
+            TenNhanVien = doc.IsDBNull(doc.GetOrdinal("employee_name")) ? "WEB · không nhân viên" : doc.GetString(doc.GetOrdinal("employee_name")),
             TenKhachHang = doc.IsDBNull(doc.GetOrdinal("customer_name")) ? "" : doc.GetString(doc.GetOrdinal("customer_name")),
             DienThoaiKhachHang = doc.IsDBNull(doc.GetOrdinal("customer_phone")) ? "" : doc.GetString(doc.GetOrdinal("customer_phone")),
             EmailKhachHang = doc.IsDBNull(doc.GetOrdinal("customer_email")) ? "" : doc.GetString(doc.GetOrdinal("customer_email"))

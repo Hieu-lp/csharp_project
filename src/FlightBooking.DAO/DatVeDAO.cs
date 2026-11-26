@@ -355,17 +355,31 @@ public sealed class DuLieuDatVe
 
     public DatVeDTO? DocDatVe(int ma, string maBam, bool canKhoa = false)
     {
+        // Luồng web luôn bắt buộc khóa tra cứu; không cho null chuyển sang quyền quản trị.
+        ArgumentNullException.ThrowIfNull(maBam);
+        return DocDatVeChung(ma, maBam, canKhoa);
+    }
+
+    // Chỉ dùng trong DAO quản trị sau khi đã kiểm tra quyền kết nối SQL của ứng dụng desktop.
+    public DatVeDTO? DocDatVeQuanTri(int ma, bool canKhoa = false)
+    {
+        return DocDatVeChung(ma, null, canKhoa);
+    }
+
+    private DatVeDTO? DocDatVeChung(int ma, string? maBam, bool canKhoa)
+    {
+        string khoa = canKhoa ? " WITH (UPDLOCK,HOLDLOCK) " : " ";
+        string noiYeuCau = maBam is null ? "" : " JOIN dbo.BOOKING_WEB_REQUEST w ON w.booking_id=b.booking_id ";
+        string locYeuCau = maBam is null ? "" : " AND w.request_hash=@hash";
         using var lenhSQL = TaoLenhSQL("""
             SELECT b.customer_id,b.flight_id,b.discount_id,b.booking_date,b.booking_source,b.ticket_quantity,
                 b.discount_amount,b.total_amount,b.status,c.full_name,c.email,c.phone,i.status
             FROM dbo.BOOKING b
-            """ + (canKhoa ? " WITH (UPDLOCK,HOLDLOCK) " : " ") + """
-            JOIN dbo.BOOKING_WEB_REQUEST w ON w.booking_id=b.booking_id
+            """ + khoa + noiYeuCau + """
             JOIN dbo.CUSTOMER c ON c.customer_id=b.customer_id
             JOIN dbo.INVOICE i
-            """ + (canKhoa ? " WITH (UPDLOCK,HOLDLOCK) " : " ") + """
-             ON i.booking_id=b.booking_id WHERE b.booking_id=@id AND w.request_hash=@hash
-            """, ("@id", ma), ("@hash", maBam));
+            """ + khoa + " ON i.booking_id=b.booking_id WHERE b.booking_id=@id" + locYeuCau,
+            ("@id", ma), ("@hash", maBam));
         int customer, chuyenBay, soLuong; int? giamGia;
         DateTime ngay; decimal tienGiam, tongTien; string nguon, trangThai, ten, email, soDienThoai, trangThaiHoaDon;
         using (var docDuLieu = lenhSQL.ExecuteReader())

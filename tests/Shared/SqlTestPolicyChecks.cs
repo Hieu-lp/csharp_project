@@ -13,6 +13,7 @@ internal static class SqlTestPolicyChecks
             throw new Exception("FAIL: unsafe SQL test settings accepted: " + label);
         }
         Refuse("Server=.;Database=FlightBookingDB;Integrated Security=True", server, SqlTestPreflight.Approval, "SQL gate rejects the main database before connecting");
+        Refuse("Server=.;Database=FlightBooking_Final;Integrated Security=True", server, SqlTestPreflight.Approval, "SQL gate keeps Final demo outside the existing test-runner whitelist");
         Refuse(target.Replace(SqlTestPreflight.DatabaseName, "Other_ManagementTests"), server, SqlTestPreflight.Approval, "SQL gate rejects suffix-only lookalikes");
         Refuse(target, server, null, "SQL gate requires explicit write approval");
         Refuse(target, "", SqlTestPreflight.Approval, "SQL gate requires a verified expected server");

@@ -22,7 +22,8 @@ internal static class Program
         var connection = Environment.GetEnvironmentVariable("FLIGHTBOOKING_UI_READ_CONNECTION");
         bool dropdownOnly = args.Contains("--dropdown-only");
         bool sqlSync = args.Contains("--sql-sync");
-        if (!sqlSync && !dropdownOnly && string.IsNullOrWhiteSpace(connection))
+        bool pdfOnly = args.Contains("--pdf-only");
+        if (!sqlSync && !dropdownOnly && !pdfOnly && string.IsNullOrWhiteSpace(connection))
             throw new InvalidOperationException("Set FLIGHTBOOKING_UI_READ_CONNECTION; checks only read existing data.");
         ApplicationConfiguration.Initialize();
         System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("vi-VN");
@@ -32,6 +33,8 @@ internal static class Program
             try
             {
                 if (sqlSync) { await SqlSyncChecks.Run(host, Check); return; }
+                if (pdfOnly) { PdfExportChecks.Run(Check); return; }
+                if (args.Contains("--quan-readonly")) { await QuanReadOnlyChecks.Run(host, connection!, Check); return; }
                 if (!dropdownOnly)
                 {
                     await Run(host, new QuanLyBUS(connection!));

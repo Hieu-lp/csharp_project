@@ -1,8 +1,15 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\FlightBooking.DAO\FlightBooking.DAO.csproj" />
     <ProjectReference Include="..\FlightBooking.DTO\FlightBooking.DTO.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NPOI" Version="2.7.6" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.2.1" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.15" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.15" />
   </ItemGroup>
 
   <PropertyGroup>

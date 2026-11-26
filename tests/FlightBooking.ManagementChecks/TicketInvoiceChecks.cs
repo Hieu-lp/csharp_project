@@ -19,8 +19,8 @@ internal static class TicketInvoiceChecks
         var bus = new VeMayBayBUS();
 
         // 1. Kiểm tra mã không hợp lệ
-        CheckAssert.ErrorContains(bus.HuyVe(0), "Mã vé không hợp lệ", "Ticket cancellation rejects invalid ticket ID 0");
-        CheckAssert.ErrorContains(bus.HuyVe(-5), "Mã vé không hợp lệ", "Ticket cancellation rejects negative ticket ID");
+        CheckAssert.ErrorContains(bus.HuyDonChuaVe(0), "Mã vé không hợp lệ", "Ticket cancellation rejects invalid ticket ID 0");
+        CheckAssert.ErrorContains(bus.HuyDonChuaVe(-5), "Mã vé không hợp lệ", "Ticket cancellation rejects negative ticket ID");
 
         // 2. Kiểm tra tìm kiếm trên ArrayList
         var dsVe = new ArrayList
@@ -134,7 +134,7 @@ internal static class TicketInvoiceChecks
 
     private static void KiemTraXuatNhapDuLieu()
     {
-        string fileTam = Path.Combine(Path.GetTempPath(), $"test_export_{Guid.NewGuid():N}.csv");
+        string fileTam = Path.Combine(Path.GetTempPath(), $"test_export_{Guid.NewGuid():N}.xls");
         try
         {
             var dsVe = new ArrayList
@@ -148,11 +148,11 @@ internal static class TicketInvoiceChecks
             };
 
             XuatNhapDuLieuBUS.XuatExcelVe(dsVe, fileTam);
-            CheckAssert.True(File.Exists(fileTam), "Export Excel creates CSV file successfully");
+            CheckAssert.True(File.Exists(fileTam), "Export Excel creates a real XLS workbook");
 
-            var dongDoc = XuatNhapDuLieuBUS.DocCSV(fileTam);
-            CheckAssert.True(dongDoc.Count >= 2, "Read CSV returns header and exported ticket record");
-            CheckAssert.True(dongDoc[1][0] == "999", "Read CSV correctly parses exported ticket ID");
+            var dongDoc = XuatNhapDuLieuBUS.DocExcel(fileTam);
+            CheckAssert.True(dongDoc.Count >= 2, "Read XLS returns header and exported ticket record");
+            CheckAssert.True(dongDoc[1][0] == "999", "Read XLS correctly parses exported ticket ID");
         }
         finally
         {

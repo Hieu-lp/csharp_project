@@ -264,19 +264,7 @@ public sealed class DatVeBUS
         // 1. Kiểm tra/chuẩn hóa DTO và giữ nguyên cấu trúc nội dung dùng để chống gửi lặp.
         KiemTraYeuCauDatVe(yeuCau, DateOnly.FromDateTime(ThoiDiemHienTai));
         var maBam = BamKhoa(khoaTraCuu);
-        var maBamNoiDung = BamChuoi(JsonSerializer.Serialize(new
-        {
-            FlightId = yeuCau.FlightId,
-            FareId = yeuCau.FareId,
-            Quantity = yeuCau.Quantity,
-            TripType = yeuCau.TripType,
-            ReturnDate = yeuCau.ReturnDate,
-            ReturnFlightId = yeuCau.ReturnFlightId,
-            ReturnFareId = yeuCau.ReturnFareId,
-            Customer = yeuCau.Customer,
-            Passengers = yeuCau.Passengers,
-            DiscountCode = yeuCau.DiscountCode
-        }));
+        var maBamNoiDung = BamChuoi(NoiDungChongGuiLap(yeuCau));
         return dao.TrongGiaoDich(duLieu =>
         {
             duLieu.KhoaYeuCau(maBam);
@@ -299,6 +287,25 @@ public sealed class DatVeBUS
                 TaoDatVeMotChang(duLieu, yeuCau, maKhachHang, maBamNoiDung, hienTai, hanhTrinh.LuotVe, BamKhoa(KhoaLuotVe(khoaTraCuu)));
             }
             return ma;
+        });
+    }
+
+    // M?t h?p ??ng serialize d?ng chung cho ??t v? v? chu?n b? fixture h?p l?.
+    // Ng??i g?i chu?n h?a DTO b?ng KiemTraYeuCauDatVe tr??c khi l?y n?i dung.
+    public static string NoiDungChongGuiLap(YeuCauDatVe yeuCau)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            FlightId = yeuCau.FlightId,
+            FareId = yeuCau.FareId,
+            Quantity = yeuCau.Quantity,
+            TripType = yeuCau.TripType,
+            ReturnDate = yeuCau.ReturnDate,
+            ReturnFlightId = yeuCau.ReturnFlightId,
+            ReturnFareId = yeuCau.ReturnFareId,
+            Customer = yeuCau.Customer,
+            Passengers = yeuCau.Passengers,
+            DiscountCode = yeuCau.DiscountCode
         });
     }
 
