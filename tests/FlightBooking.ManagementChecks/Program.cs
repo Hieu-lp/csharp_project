@@ -84,4 +84,5 @@ CustomerChecks.Run();
 EmployeeChecks.Run();
 DiscountCodeChecks.Run();
 ArrayListSearchChecks.Run();
+TicketInvoiceChecks.Run();
 Console.WriteLine($"{checks} checks passed.");

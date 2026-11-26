@@ -62,6 +62,9 @@ public sealed class MainForm : Form
         ThemNutDieuHuong(danhSachNut, "Khách hàng", () => MoModule("Khách hàng", () => new QuanLyKhachHangForm()));
         ThemNutDieuHuong(danhSachNut, "Nhân viên", () => MoModule("Nhân viên", () => new QuanLyNhanVienForm()));
         ThemNutDieuHuong(danhSachNut, "Mã giảm giá", () => MoModule("Mã giảm giá", () => new QuanLyMaGiamGiaForm()));
+        ThemNutDieuHuong(danhSachNut, "Vé máy bay", () => MoModule("Vé máy bay", () => new QuanLyVeForm()));
+        ThemNutDieuHuong(danhSachNut, "Hóa đơn", () => MoModule("Hóa đơn", () => new QuanLyHoaDonForm()));
+        ThemNutDieuHuong(danhSachNut, "Thống kê", () => MoModule("Thống kê", () => new ThongKeDoanhThuForm()));
         ThemNutDieuHuong(danhSachNut, "Giới thiệu", () => MessageBox.Show(this,
             "Ứng dụng quản lý hệ thống đặt vé máy bay.", "Giới thiệu", MessageBoxButtons.OK, MessageBoxIcon.Information));
         ThemNutDieuHuong(danhSachNut, "Thoát", Close);
@@ -90,6 +93,9 @@ public sealed class MainForm : Form
         QuanLyKhachHangForm khachHang => khachHang.CoTheRoiTrang(),
         QuanLyNhanVienForm nhanVien => nhanVien.CoTheRoiTrang(),
         QuanLyMaGiamGiaForm maGiamGia => maGiamGia.CoTheRoiTrang(),
+        QuanLyVeForm ve => ve.CoTheRoiTrang(),
+        QuanLyHoaDonForm hoaDon => hoaDon.CoTheRoiTrang(),
+        ThongKeDoanhThuForm thongKe => thongKe.CoTheRoiTrang(),
         _ => true
     };
 

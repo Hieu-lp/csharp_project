@@ -163,7 +163,98 @@ public static class TimKiemArrayList
                     throw new ArgumentException($"Không có trường DISCOUNT_CODE tên '{truong}'.", nameof(truong));
             }
         }
-        throw new ArgumentException("Bộ lọc chỉ nhận DTO khách hàng, nhân viên hoặc mã giảm giá.", nameof(dong));
+        if (dong is VeMayBayDTO ve)
+        {
+            switch (tenTruong)
+            {
+                case "TICKETID":
+                case "MAVE":
+                    return ve.MaVe;
+                case "FLIGHTID":
+                case "MACHUYENBAY":
+                    return ve.MaChuyenBay;
+                case "FAREID":
+                case "MAHANGVE":
+                    return ve.MaHangVe;
+                case "SEATNUMBER":
+                case "SOGHE":
+                    return ve.SoGhe;
+                case "CLASSNAME":
+                case "TENHANGVE":
+                    return ve.TenHangVe;
+                case "PRICE":
+                case "GIAVE":
+                    return ve.GiaVe;
+                case "STATUS":
+                case "TRANGTHAI":
+                    return ve.TrangThai;
+                case "PASSENGERNAME":
+                case "TENHANHKHACH":
+                    return ve.TenHanhKhach;
+                case "PASSENGERIDCARD":
+                case "SOGIAYTO":
+                    return ve.SoGiayTo;
+                case "DEPARTUREAIRPORT":
+                case "SANBAYDI":
+                    return ve.SanBayDi;
+                case "ARRIVALAIRPORT":
+                case "SANBAYDEN":
+                    return ve.SanBayDen;
+                case "BOOKINGID":
+                case "MADATVE":
+                    return ve.MaDatVe;
+                default:
+                    throw new ArgumentException($"Không có trường TICKET tên '{truong}'.", nameof(truong));
+            }
+        }
+        if (dong is HoaDonDTO hoaDon)
+        {
+            switch (tenTruong)
+            {
+                case "INVOICEID":
+                case "MAHOADON":
+                    return hoaDon.MaHoaDon;
+                case "BOOKINGID":
+                case "MADATVE":
+                    return hoaDon.MaDatVe;
+                case "INVOICEDATE":
+                case "NGAYHOADON":
+                    return hoaDon.NgayHoaDon;
+                case "TOTAL":
+                case "TONGTIENGOC":
+                    return hoaDon.TongTienGoc;
+                case "DISCOUNTAMOUNT":
+                case "TIENGIAM":
+                    return hoaDon.TienGiam;
+                case "TAXAMOUNT":
+                case "TIENTHUE":
+                    return hoaDon.TienThue;
+                case "TOTALAMOUNT":
+                case "TONGTIEN":
+                    return hoaDon.TongTien;
+                case "STATUS":
+                case "TRANGTHAI":
+                    return hoaDon.TrangThai;
+                case "CUSTOMERNAME":
+                case "TENKHACHHANG":
+                    return hoaDon.TenKhachHang;
+                case "CUSTOMERPHONE":
+                case "DIENTHOAI":
+                    return hoaDon.DienThoaiKhachHang;
+                case "CUSTOMEREMAIL":
+                case "EMAIL":
+                    return hoaDon.EmailKhachHang;
+                case "FLIGHTID":
+                case "MACHUYENBAY":
+                    return hoaDon.MaChuyenBay;
+                case "TICKETCOUNT":
+                case "SOLUONGVE":
+                    return hoaDon.SoLuongVe;
+                default:
+                    throw new ArgumentException($"Không có trường INVOICE tên '{truong}'.", nameof(truong));
+            }
+        }
+        throw new ArgumentException("Bộ lọc chỉ nhận DTO khách hàng, nhân viên, mã giảm giá, vé hoặc hóa đơn.", nameof(dong));
     }
 
     private static void KiemTraDieuKien(DieuKienTimKiemDTO dieuKien)
