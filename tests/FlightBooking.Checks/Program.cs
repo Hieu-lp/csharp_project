@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using FlightBooking.BUS;
 using FlightBooking.DTO;
 
@@ -25,6 +25,22 @@ Reject(() => DatVeBUS.TinhGiamGia(discount with { TrangThai = "INACTIVE" }, 1000
 Reject(() => DatVeBUS.TinhGiamGia(discount with { NgayBatDau = now.AddDays(1) }, 1000000, now), "future code");
 Reject(() => DatVeBUS.TinhGiamGia(discount with { NgayKetThuc = now.AddSeconds(-1) }, 1000000, now), "expired code");
 Reject(() => DatVeBUS.TinhGiamGia(discount with { SoLanDaDung = 10 }, 1000000, now), "exhausted code");
+Check(DatVeBUS.KiemTraGheDaChon(6,new(){"1A"},2,new[]{"1B","1C"}).SequenceEqual(new[]{"1B","1C"}),"confirmed seats preserve passenger order");
+Reject(()=>DatVeBUS.KiemTraGheDaChon(6,new(){"1B"},1,new[]{"1B"}),"lost confirmed seat rejected instead of silently reassigned");
+Reject(()=>DatVeBUS.KiemTraGheDaChon(6,new(),2,new[]{"1A","1A"}),"confirmed duplicate seat rejected");
+Reject(()=>DatVeBUS.KiemTraGheDaChon(6,new(),1,new[]{"2A"}),"confirmed seat outside capacity rejected");
+Reject(()=>DatVeBUS.KiemTraGheDaChon(6,new(),2,new[]{"1A"}),"confirmed seat count must match passengers");
+Reject(()=>DatVeBUS.KiemTraSoDoGhe(2,new(){"1A","2A"}),"legacy seat outside physical map blocks new booking without mutation");
+var hashSeat=new YeuCauDatVe();var legacyHash=DatVeBUS.NoiDungChongGuiLap(hashSeat);
+Check(!legacyHash.Contains("Seats"),"legacy payload contract remains unchanged when seats absent");
+hashSeat.Seats=new(){"1A"};var firstHash=DatVeBUS.NoiDungChongGuiLap(hashSeat);hashSeat.Seats[0]="1B";
+Check(firstHash!=DatVeBUS.NoiDungChongGuiLap(hashSeat),"idempotency content includes confirmed seats");
+var chartEmpty=ThongKeBUS.TronTheoHangVe(new[]{new MaTranDoanhThuDTO{Ten="A",Tong=0}});Check(chartEmpty.Count==0,"zero total pie stays empty");
+var many=new List<MaTranDoanhThuDTO>();for(int i=1;i<=9;i++)many.Add(new(){Ten="H"+i,Tong=i});
+var pie=ThongKeBUS.TronTheoHangVe(many);Check(pie.Count==7 && pie.Sum(x=>x.GiaTri)==45 && Math.Abs(pie.Sum(x=>x.TyLe)-100)<0.0001m,"pie other bucket preserves money and percent");
+var quarterly=ThongKeBUS.CotTheoQuy(new(){TheoThoiGian=new(){new(){Nam=2026,Thang=2,DoanhThu=100}}},new(){Nam=2026});Check(quarterly.Count==4 && quarterly.Sum(x=>x.GiaTri)==100,"quarterly chart preserves the monthly filter total and empty quarters");
+var bars=ThongKeBUS.CotTheoThang(new(){TheoThoiGian=new(){new(){Nam=2026,Thang=2,DoanhThu=100}}},new(){Nam=2026});
+Check(bars.Count==12 && bars.Sum(x=>x.GiaTri)==100 && bars[0].GiaTri==0,"bar chart includes zero months without inventing revenue");
 var seats = DatVeBUS.CapGhe(6, new(StringComparer.OrdinalIgnoreCase) { "1A", "1C" }, 4);
 Check(seats.SequenceEqual(new[] { "1B", "1D", "1E", "1F" }), "allocate distinct free seats");
 Reject(() => DatVeBUS.CapGhe(2, new() { "1A", "1B" }, 1), "reject full aircraft");
@@ -62,6 +78,18 @@ Reject(() => DatVeBUS.KiemTraYeuCauDatVe(bad, DateOnly.FromDateTime(now)), "miss
 bad = Valid(); bad.Customer.Email = "invalid";
 Reject(() => DatVeBUS.KiemTraYeuCauDatVe(bad, DateOnly.FromDateTime(now)), "invalid email");
 var booking = new DatVeDTO(1,1,1,null,now,"WEB",1,0,1000000,"CONFIRMED","Test","test@example.test","0900000000","UNPAID",flight,[]);
+var editBooking = booking with { ChiTiet = [new ChiTietDatVeDTO(1,1,"Test","DOC-1",1000000,"1A","Economy","ISSUED")] };
+DatVeBUS.KiemTraDieuKienSua(editBooking,now); Check(true,"passenger correction permits unpaid issued future ticket");
+Reject(() => DatVeBUS.KiemTraDieuKienSua(editBooking with { TrangThaiHoaDon="PAID" },now),"passenger correction rejects paid ticket");
+Reject(() => DatVeBUS.KiemTraDieuKienSua(editBooking with { TrangThai="CANCELLED" },now),"passenger correction rejects cancelled booking");
+Reject(() => DatVeBUS.KiemTraDieuKienSua(editBooking,flight.ThoiDiemKhoiHanh),"passenger correction rejects exact departure");
+Reject(() => DatVeBUS.KiemTraDieuKienSua(booking,now),"passenger correction rejects missing ticket details");
+Reject(() => DatVeBUS.KiemTraDieuKienSua(editBooking with { ChiTiet=[editBooking.ChiTiet[0] with { TrangThaiVe="CANCELLED" }] },now),"passenger correction rejects cancelled ticket");
+Reject(() => DatVeBUS.KiemTraThongTinSua(new() { FullName=" ",IdCard="DOC-1" }),"passenger correction requires a name");
+Reject(() => DatVeBUS.KiemTraThongTinSua(new() { FullName="Test",IdCard=" "+new string('A',51) }),"passenger correction enforces document capacity");
+Reject(() => DatVeBUS.KiemTraThongTinSua(new() { FullName="Test",IdCard="bad paper" }),"passenger correction enforces document format");
+var corrected=DatVeBUS.KiemTraThongTinSua(new() { FullName=" Test ",IdCard=" doc-1 " });
+Check(corrected.FullName=="Test" && corrected.IdCard=="DOC-1","passenger correction normalizes without inventing identity");
 DatVeBUS.KiemTraHuyVe(booking, now); Check(true, "allow unpaid before departure");
 Reject(() => DatVeBUS.KiemTraHuyVe(booking with { TrangThaiHoaDon = "PAID" }, now), "paid cancellation needs staff");
 Reject(() => DatVeBUS.KiemTraHuyVe(booking, flight.ThoiDiemKhoiHanh), "reject cancellation at departure");

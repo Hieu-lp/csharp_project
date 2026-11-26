@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace FlightBooking.DTO;
 
@@ -117,3 +117,5 @@ public class DoanhThuTheoChuyenBayDTO
     [JsonPropertyName("Revenue")]
     public decimal DoanhThu { get; set; }
 }
+
+public sealed record DiemBieuDoDTO(string Nhan, decimal GiaTri, decimal TyLe);

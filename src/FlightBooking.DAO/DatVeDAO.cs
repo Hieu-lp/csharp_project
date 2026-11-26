@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using FlightBooking.DTO;
 using Microsoft.Data.SqlClient;
 
@@ -22,7 +22,7 @@ public sealed class DatVeDAO
     private static LoiDatVe ChuyenLoiSQL(SqlException loi)
     {
         if (loi.Number == 208)
-            return new LoiDatVe("Database chưa đủ bảng. Cần người phụ trách Database kiểm tra script 01–03 và duyệt script 08.", loi);
+            return new LoiDatVe("Database chưa đủ bảng. Kiểm tra đúng kết nối và đối chiếu bộ Database/Final/ theo README; không tạo lại hoặc seed lại database đang dùng.", loi);
         if (loi.Number == 1205 || loi.Number == 2601 || loi.Number == 2627)
             return new LoiDatVe("Dữ liệu vừa thay đổi hoặc yêu cầu đang xử lý. Vui lòng gửi lại cùng biểu mẫu.", loi);
         return new LoiDatVe("Không thể xử lý với SQL Server. Vui lòng thử lại hoặc liên hệ nhóm quản lý.", loi);
@@ -301,13 +301,59 @@ public sealed class DuLieuDatVe
         ("@dob", dauVao.DateOfBirth), ("@gender", dauVao.Gender), ("@passport", dauVao.IdPassportNumber));
     }
 
-    public int ThemDatVe(int maKhachHang, BaoGiaDatVeDTO baoGia, DateTime hienTai)
+    public List<(int Booking, int Flight, string? Hash)> DocLienKetSuaVe(int maVe)
+    {
+        using var lenh = TaoLenhSQL("""
+            SELECT b.booking_id,b.flight_id,w.request_hash
+            FROM dbo.BOOKING b LEFT JOIN dbo.BOOKING_WEB_REQUEST w ON w.booking_id=b.booking_id
+            WHERE b.booking_id=(SELECT booking_id FROM dbo.BOOKING_DETAIL WHERE ticket_id=@ticket)
+               OR w.payload_hash=(SELECT w0.payload_hash FROM dbo.BOOKING_WEB_REQUEST w0
+                   JOIN dbo.BOOKING_DETAIL bd ON bd.booking_id=w0.booking_id WHERE bd.ticket_id=@ticket)
+            ORDER BY b.flight_id,b.booking_id
+            """, ("@ticket", maVe));
+        using var doc = lenh.ExecuteReader();
+        var ketQua = new List<(int Booking, int Flight, string? Hash)>();
+        while (doc.Read()) ketQua.Add((doc.GetInt32(0), doc.GetInt32(1), doc.IsDBNull(2) ? null : doc.GetString(2)));
+        return ketQua;
+    }
+
+    public void DoiGheVe(int maVe, string cu, string moi)
+    {
+        if(ThucThi("UPDATE dbo.TICKET SET seat_number=@new WHERE ticket_id=@id AND seat_number=@old AND status='ISSUED'",("@new",moi),("@id",maVe),("@old",cu))!=1)
+            throw new LoiDatVe("Vé vừa thay đổi. Chưa đổi ghế.");
+    }
+
+    public void SuaHanhKhach(int maDatVe, int maVe, ThongTinHanhKhach thongTin)
+    {
+        if (ThucThi("UPDATE dbo.BOOKING_DETAIL SET passenger_full_name=@name,passenger_id_card=@paper WHERE booking_id=@booking AND ticket_id=@ticket",
+            ("@name", thongTin.FullName), ("@paper", thongTin.IdCard), ("@booking", maDatVe), ("@ticket", maVe)) != 1)
+            throw new LoiDatVe("Thông tin vé vừa thay đổi. Giao dịch sửa đã được hoàn tác.");
+    }
+
+    public ThongTinKhachDat DocKhachTaiQuay(int maKhachHang, bool canKhoa = false)
+    {
+        using var lenh = TaoLenhSQL("SELECT full_name,phone,email,date_of_birth,gender,id_passport_number FROM dbo.CUSTOMER " +
+            (canKhoa ? "WITH (UPDLOCK,HOLDLOCK) " : "") + "WHERE customer_id=@id", ("@id", maKhachHang));
+        using var doc = lenh.ExecuteReader();
+        if (!doc.Read()) throw new LoiDatVe("Khách hàng không còn tồn tại.");
+        return new ThongTinKhachDat { FullName = doc.GetString(0), Phone = doc.GetString(1), Email = doc.GetString(2),
+            DateOfBirth = DateOnly.FromDateTime(doc.GetDateTime(3)), Gender = doc.GetString(4),
+            IdPassportNumber = doc.IsDBNull(5) ? null : doc.GetString(5) };
+    }
+
+    public bool NhanVienConHoatDong(int maNhanVien)
+    {
+        using var lenh = TaoLenhSQL("SELECT COUNT(*) FROM dbo.EMPLOYEE WITH (UPDLOCK,HOLDLOCK) WHERE employee_id=@id AND status='ACTIVE'", ("@id", maNhanVien));
+        return Convert.ToInt32(lenh.ExecuteScalar()) == 1;
+    }
+
+    public int ThemDatVe(int maKhachHang, BaoGiaDatVeDTO baoGia, DateTime hienTai, int? maNhanVien = null)
     {
         return LayMaMoi("""
         INSERT dbo.BOOKING(customer_id,employee_id,flight_id,discount_id,booking_date,booking_source,
             ticket_quantity,discount_amount,total_amount,status)
-        OUTPUT INSERTED.booking_id VALUES (@customer,NULL,@flight,@discount,@now,'WEB',@qty,@amount,@total,'CONFIRMED')
-        """, ("@customer", maKhachHang), ("@flight", baoGia.ChuyenBay.MaChuyenBay), ("@discount", baoGia.MaGiamGia),
+        OUTPUT INSERTED.booking_id VALUES (@customer,@employee,@flight,@discount,@now,@source,@qty,@amount,@total,'CONFIRMED')
+        """, ("@customer", maKhachHang), ("@employee", maNhanVien), ("@source", maNhanVien.HasValue ? "COUNTER" : "WEB"), ("@flight", baoGia.ChuyenBay.MaChuyenBay), ("@discount", baoGia.MaGiamGia),
         ("@now", hienTai), ("@qty", baoGia.SoLuong), ("@amount", baoGia.TienGiam), ("@total", baoGia.TongTien));
     }
 

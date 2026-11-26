@@ -1,4 +1,4 @@
-using FlightBooking.DAO;
+﻿using FlightBooking.DAO;
 using FlightBooking.DTO;
 using System.Collections;
 
@@ -10,6 +10,9 @@ namespace FlightBooking.BUS;
 public class VeMayBayBUS
 {
     private readonly VeMayBayDAO dao = new();
+
+    public void SuaHanhKhach(int maVe, ThongTinHanhKhach thongTin)
+        => new DatVeBUS().SuaThongTinHanhKhach(maVe, thongTin);
 
     public ArrayList DocDSVe()
     {
@@ -74,6 +77,7 @@ public class VeMayBayBUS
 
             bool khopTuKhoa =
                 ve.MaVe.ToString().Contains(chuoiTim, StringComparison.OrdinalIgnoreCase) ||
+                (ve.MaDatVe?.ToString().Contains(chuoiTim, StringComparison.OrdinalIgnoreCase) ?? false) ||
                 ve.SoGhe.Contains(chuoiTim, StringComparison.OrdinalIgnoreCase) ||
                 ve.TenHanhKhach.Contains(chuoiTim, StringComparison.OrdinalIgnoreCase) ||
                 ve.SoGiayTo.Contains(chuoiTim, StringComparison.OrdinalIgnoreCase) ||

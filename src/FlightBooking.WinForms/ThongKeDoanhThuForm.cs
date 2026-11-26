@@ -1,4 +1,4 @@
-using FlightBooking.BUS;
+﻿using FlightBooking.BUS;
 using FlightBooking.DTO;
 
 namespace FlightBooking.WinForms;
@@ -21,6 +21,8 @@ public sealed class ThongKeDoanhThuForm : Form
     private ThongKeDoanhThuDTO? duLieu;
     private BoLocThongKeDTO? boLocDaTai;
     private bool dangTai;
+    private readonly BieuDoThongKe cot=new(),tron=new(){HinhTron=true};
+    private readonly ComboBox kyCot=new(){DropDownStyle=ComboBoxStyle.DropDownList,Dock=DockStyle.Top};
 
     public ThongKeDoanhThuForm()
     {
@@ -38,13 +40,16 @@ public sealed class ThongKeDoanhThuForm : Form
         for (int i = 1; i <= 4; i++)
             quy.Items.Add("Quý " + i);
         thang.SelectedIndex = quy.SelectedIndex = 0;
-        var khung = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 1, RowCount = 6 };
+        var cuon = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Name = "CuonThongKe" };
+        var khung = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(16), ColumnCount = 1, RowCount = 7 };
         khung.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (int i = 0; i < 5; i++)
             khung.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        khung.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        // Giữ chiều cao biểu đồ và bảng; màn hình thấp cuộn trang thay vì ép mất danh sách.
+        khung.RowStyles.Add(new RowStyle(SizeType.Absolute, 400));
+        khung.RowStyles.Add(new RowStyle(SizeType.Absolute, 290));
         khung.Controls.Add(GiaoDien.TaoNhan("THỐNG KÊ HÓA ĐƠN VÀ TỔNG THU", 14, true), 0, 0);
-        var chuThich = GiaoDien.TaoNhan("PAID theo ngày LẬP hóa đơn; chưa có ngày nhận tiền riêng. Tổng chi / lợi nhuận: chưa xác định (chưa có nguồn chi phí).", 9);
+        var chuThich = GiaoDien.TaoNhan("PAID theo ngày LẬP hóa đơn; chưa có ngày nhận tiền riêng. Tổng chi / lợi nhuận: chưa xác định (chưa có nguồn chi phí). Ma trận Q1–Q4 tách theo năm; đơn vị VND.", 9);
         chuThich.MaximumSize = new Size(900, 0);
         khung.Controls.Add(chuThich, 0, 1);
         var loc = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Margin = Padding.Empty };
@@ -57,14 +62,37 @@ public sealed class ThongKeDoanhThuForm : Form
         the.Controls.AddRange([tongThu, chuaThu, soLuong]);
         khung.Controls.Add(the, 0, 3);
         khung.Controls.Add(thongBao, 0, 4);
-        var cacThe = new TabControl { Dock = DockStyle.Fill };
-        ThemBang(cacThe, "Theo tháng", ["Năm", "Tháng", "Quý", "Hóa đơn PAID", "Vé PAID", "Tổng thu"]);
-        ThemBang(cacThe, "Theo quý", ["Năm", "Quý", "Hóa đơn PAID", "Vé PAID", "Tổng thu"]);
-        ThemBang(cacThe, "Theo năm", ["Năm", "Hóa đơn PAID", "Vé PAID", "Tổng thu"]);
+        var cacThe = new TabControl { Dock = DockStyle.Fill, Multiline = true, Name = "BangThongKe" };
+        ThemBang(cacThe, "Theo tháng", ["Năm", "Tháng", "Quý", "Hóa đơn PAID", "Vé PAID", "Tổng thu (VND)"]);
+        ThemBang(cacThe, "Theo quý", ["Năm", "Quý", "Hóa đơn PAID", "Vé PAID", "Tổng thu (VND)"]);
+        ThemBang(cacThe, "Theo năm", ["Năm", "Hóa đơn PAID", "Vé PAID", "Tổng thu (VND)"]);
         foreach (string ten in new[] { "Nhân viên", "Khách hàng", "Chuyến bay", "Hạng vé" })
-            ThemBang(cacThe, ten, ["Mã", "Đối tượng", "Năm", "Q1", "Q2", "Q3", "Q4", "Tổng"]);
-        khung.Controls.Add(cacThe, 0, 5);
-        Controls.Add(khung);
+            ThemBang(cacThe, ten, ["Mã", "Đối tượng", "Năm", "Q1 (VND)", "Q2 (VND)", "Q3 (VND)", "Q4 (VND)", "Tổng (VND)"]);
+        kyCot.Items.AddRange(["Theo tháng", "Theo quý"]);
+        kyCot.SelectedIndex = 0;
+        kyCot.AccessibleName = "Kỳ biểu đồ cột";
+        kyCot.SelectedIndexChanged += (_, _) =>
+        {
+            if (duLieu == null || boLocDaTai == null) return;
+            cot.TheoQuy = kyCot.SelectedIndex == 1;
+            cot.GanDuLieu(cot.TheoQuy ? ThongKeBUS.CotTheoQuy(duLieu, boLocDaTai) : ThongKeBUS.CotTheoThang(duLieu, boLocDaTai));
+        };
+        var bieuDo = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Name = "VungBieuDo", Margin = new Padding(0, 8, 0, 12) };
+        bieuDo.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        bieuDo.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        bieuDo.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        var vungCot = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = new Padding(0, 0, 8, 0) };
+        vungCot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        vungCot.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        vungCot.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        vungCot.Controls.Add(kyCot, 0, 0);
+        vungCot.Controls.Add(cot, 0, 1);
+        bieuDo.Controls.Add(vungCot, 0, 0);
+        bieuDo.Controls.Add(tron, 1, 0);
+        khung.Controls.Add(bieuDo, 0, 5);
+        khung.Controls.Add(cacThe, 0, 6);
+        cuon.Controls.Add(khung);
+        Controls.Add(cuon);
         Load += async (_, _) => await TaiSoLieu();
         SizeChanged += (_, _) => { chuThich.MaximumSize = new Size(Math.Max(200, ClientSize.Width - 40), 0); thongBao.MaximumSize = new Size(Math.Max(200, ClientSize.Width - 40), 0); };
     }
@@ -73,8 +101,8 @@ public sealed class ThongKeDoanhThuForm : Form
     {
         var bang = GiaoDien.TaoDanhSach();
         for (int i = 0; i < cot.Length; i++)
-            bang.Columns.Add(cot[i], cot[i] == "Đối tượng" ? 230 : cot[i].StartsWith("Q") || cot[i] == "Tổng" || cot[i] == "Tổng thu" ? 145 : 100);
-        var trang = new TabPage(ten) { BackColor = GiaoDien.MauNen, Padding = new Padding(8) };
+            bang.Columns.Add(cot[i], cot[i] == "Đối tượng" ? 230 : cot[i].Contains("VND") ? 145 : 100);
+        var trang = new TabPage(ten is "Nhân viên" or "Khách hàng" or "Chuyến bay" or "Hạng vé" ? "Doanh thu đã thu theo " + ten.ToLowerInvariant() : ten) { BackColor = GiaoDien.MauNen, Padding = new Padding(8) };
         trang.Controls.Add(bang);
         cacThe.TabPages.Add(trang);
         cacBang.Add(ten, bang);
@@ -105,6 +133,10 @@ public sealed class ThongKeDoanhThuForm : Form
             ThongKeDoanhThuDTO ketQua = await Task.Run(() => bus.ThongKeTongHop(loc));
             if (IsDisposed)
                 return;
+            cot.TheoQuy=kyCot.SelectedIndex==1;
+            var diemCot=cot.TheoQuy?ThongKeBUS.CotTheoQuy(ketQua,loc):ThongKeBUS.CotTheoThang(ketQua,loc);
+            var diemTron=ThongKeBUS.TronTheoHangVe(ketQua.TheoHangVe);
+            cot.GanDuLieu(diemCot);tron.GanDuLieu(diemTron);
             duLieu = ketQua;
             boLocDaTai = loc;
             tongThu.Text = "Tổng thu PAID: " + ketQua.DoanhThuDaThu.ToString("N2") + " đ";
@@ -136,6 +168,7 @@ public sealed class ThongKeDoanhThuForm : Form
         {
             if (IsDisposed)
                 return;
+            cot.GanDuLieu(new());tron.GanDuLieu(new());
             duLieu = null;
             boLocDaTai = null;
             tongThu.Text = "Tổng thu: chưa tải được";
@@ -157,7 +190,7 @@ public sealed class ThongKeDoanhThuForm : Form
             bang.Items.Add(new ListViewItem([dong.Ma, dong.Ten, dong.Nam.ToString(), dong.Quy1.ToString("N2"), dong.Quy2.ToString("N2"), dong.Quy3.ToString("N2"), dong.Quy4.ToString("N2"), dong.Tong.ToString("N2")]));
         }
         var tong = ThongKeBUS.TinhDongTong(nguon);
-        bang.Items.Add(new ListViewItem(["", tong.Ten, "", tong.Quy1.ToString("N2"), tong.Quy2.ToString("N2"), tong.Quy3.ToString("N2"), tong.Quy4.ToString("N2"), tong.Tong.ToString("N2")]));
+        bang.Items.Add(new ListViewItem(["", tong.Ten, boLocDaTai?.Nam?.ToString() ?? "Tất cả năm", tong.Quy1.ToString("N2"), tong.Quy2.ToString("N2"), tong.Quy3.ToString("N2"), tong.Quy4.ToString("N2"), tong.Tong.ToString("N2")]));
     }
 
     private Task XuatExcel()

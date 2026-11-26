@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using FlightBooking.BUS;
 using FlightBooking.DAO;
 using FlightBooking.DTO;
@@ -23,6 +23,13 @@ internal static class FinalIntegrationChecks
 
     public static void Run()
     {
+        foreach (var ids in new[] { (0, 1), (1, 0), (-1, 1) })
+        {
+            Exception? loi = null;
+            try { new DatVeBUS("").TaoDatVeTaiQuay(new YeuCauDatVe(), ids.Item1, ids.Item2, ""); }
+            catch (Exception e) { loi = e; }
+            CheckAssert.True(loi is LoiDatVe, "counter rejects invalid customer/employee before SQL");
+        }
         KiemTraChungTu();
         KiemTraThongKe();
         KiemTraBoLoc();

@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 namespace FlightBooking.DTO;
@@ -78,6 +78,10 @@ public sealed class ThongTinHanhKhach
 
 public sealed class YeuCauDatVe
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Seats { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? ReturnSeats { get; set; }
     public int Quantity { get; set; } = 1;
     public string TripType { get; set; } = "OneWay";
     public DateOnly? ReturnDate { get; set; }

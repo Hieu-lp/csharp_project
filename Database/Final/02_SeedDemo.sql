@@ -1,7 +1,6 @@
 ﻿:ON ERROR EXIT
--- REVIEWABLE DEMO PROFILE: 8 airports,25 customers,7 employees,6 discounts,
--- 43 flights,85 fares,81 bookings/invoices,141 tickets/details,41 web requests.
--- Confirm required minimum quantities before executing this profile.
+-- Approved handover profile: 15 airports,50 customers,15 employees,15 discounts,
+-- 43 flights,129 fares,81 bookings/invoices,141 tickets/details,41 WEB legs.
 -- Derived from 04/07; old scripts are NOT executed and never changed.
 -- Future flights are relative to setup day; historical statistics cover prior year.
 -- Full-used discount has one real linked demo booking; all counters reconcile.
@@ -19,7 +18,7 @@ SET NOCOUNT ON;
 SET XACT_ABORT ON;
 IF DB_NAME()<>N'FlightBooking_Final' OR CONVERT(nvarchar(128),SERVERPROPERTY('ServerName'))<>N'$(EXPECTED_SERVER)'
  THROW 51250,'Wrong server/database for Final seed.',1;
-IF N'$(SEED_APPROVAL)'<>N'APPROVE_SEED_FLIGHTBOOKING_FINAL_DEMO' OR N'$(SEED_PROFILE)'<>N'DEMO_8_25_7_6_43_85_81_141'
+IF N'$(SEED_APPROVAL)'<>N'APPROVE_SEED_FLIGHTBOOKING_FINAL_DEMO' OR N'$(SEED_PROFILE)'<>N'DEMO_15_50_15_15_43_129_81_141'
  THROW 51251,'Expected approved seed profile/approval is missing.',1;
 IF NOT EXISTS(SELECT 1 FROM sys.extended_properties WHERE class=0 AND name=N'BookingFlight.FinalDemo' AND CONVERT(nvarchar(128),value)=N'Final-20261127-v1')
  THROW 51252,'Final marker missing.',1;
@@ -51,481 +50,179 @@ IF EXISTS(SELECT 1 FROM dbo.[AIRPORT])
  OR EXISTS(SELECT 1 FROM dbo.[INVOICE_DETAIL])
  OR EXISTS(SELECT 1 FROM dbo.[BOOKING_WEB_REQUEST])
  THROW 51256,'All 12 tables must be empty before first seed.',1;
-GO
--- Adapted original demo block
-/* Demo data for the new 11-table schema. Fictional people/identifiers.
-   One confirmed WEB booking, one paid invoice, one active ticket, plus
-   11 round-trip flight pairs (Nov 2026 .. Jan 2027) and their fare classes.
-   Run ONCE after steps 01-03 on a fresh DB. No real passenger data. */
 
-
-SET XACT_ABORT ON;
-
-BEGIN TRY
-    BEGIN TRANSACTION;
-
-    IF EXISTS (SELECT 1 FROM dbo.AIRPORT)
-       OR EXISTS (SELECT 1 FROM dbo.FLIGHT)
-       OR EXISTS (SELECT 1 FROM dbo.BOOKING)
-    BEGIN
-        THROW 51001, N'Da co du lieu. Chi chay seed nay tren Database moi, khong chay lai de tranh trung.', 1;
-    END;
-
-    DECLARE @AirportSGN INT, @AirportHAN INT, @AirportDAD INT, @CustomerId INT, @EmployeeId INT;
-    DECLARE @DiscountId INT, @FlightId INT, @FareId INT, @TicketId INT;
-    DECLARE @BookingId INT, @InvoiceId INT;
-
-    INSERT INTO dbo.AIRPORT(airport_name, city)
-    VALUES (N'Sân bay Tân Sơn Nhất', N'TP. Hồ Chí Minh');
-    SET @AirportSGN = CONVERT(INT, SCOPE_IDENTITY());
-
-    INSERT INTO dbo.AIRPORT(airport_name, city)
-    VALUES (N'Sân bay Nội Bài', N'Hà Nội');
-    SET @AirportHAN = CONVERT(INT, SCOPE_IDENTITY());
-
-    INSERT INTO dbo.AIRPORT(airport_name, city)
-    VALUES (N'San bay Da Nang', N'Da Nang');
-    SET @AirportDAD = CONVERT(INT, SCOPE_IDENTITY());
-
-    INSERT INTO dbo.CUSTOMER(full_name, phone, email, date_of_birth, gender, id_passport_number)
-    VALUES (N'Khách hàng Demo', '0900000001', 'customer.demo@example.test', '2000-05-10', N'Khác', NULL);
-    SET @CustomerId = CONVERT(INT, SCOPE_IDENTITY());
-
-    INSERT INTO dbo.EMPLOYEE(full_name, phone, email, position, hire_date, status)
-    VALUES (N'Nhân viên Demo', '0900000002', 'staff.demo@example.test', N'Nhân viên bán vé', '2026-01-01', 'ACTIVE');
-    SET @EmployeeId = CONVERT(INT, SCOPE_IDENTITY());
-
-    INSERT INTO dbo.DISCOUNT_CODE(code,description,discount_type,discount_value,
-       min_order_amount,max_discount_amount,start_date,end_date,usage_limit,used_count,status)
-    VALUES ('DEMO10',N'Giảm 10% cho đơn đặt vé thử nghiệm','PERCENT',10.00,
-       0,200000.00,DATEFROMPARTS(YEAR(SYSDATETIME())-1,1,1),DATEFROMPARTS(YEAR(SYSDATETIME())+2,12,31),100,0,'ACTIVE');
-    SET @DiscountId = CONVERT(INT, SCOPE_IDENTITY());
-
-    INSERT INTO dbo.FLIGHT(departure_airport_id,arrival_airport_id,total_seats,
-       tickets_sold,seats_available,total_revenue,
-       departure_date,departure_time,arrival_date,arrival_time,status)
-    VALUES (@AirportSGN,@AirportHAN,100,0,100,0,
-       DATEADD(DAY,7,CAST(SYSDATETIME() AS date)),'08:30:00',DATEADD(DAY,7,CAST(SYSDATETIME() AS date)),'10:45:00','SCHEDULED');
-    SET @FlightId = CONVERT(INT, SCOPE_IDENTITY());
-
-    INSERT INTO dbo.FARE_CLASS(flight_id,class_name,price,base_baggage_kg)
-    VALUES (@FlightId,N'Economy',1200000.00,7);
-    SET @FareId = CONVERT(INT, SCOPE_IDENTITY());
-
-    INSERT INTO dbo.TICKET(flight_id,fare_id,seat_number,issued_at,status)
-    VALUES (@FlightId,@FareId,'12A',SYSDATETIME(),'ISSUED');
-    SET @TicketId = CONVERT(INT, SCOPE_IDENTITY());
-
-    INSERT INTO dbo.BOOKING(customer_id,employee_id,flight_id,discount_id,
-       booking_date,booking_source,ticket_quantity,discount_amount,total_amount,status)
-    VALUES (@CustomerId,NULL,@FlightId,@DiscountId,SYSDATETIME(),
-       'WEB',1,120000.00,1080000.00,'CONFIRMED');
-    SET @BookingId = CONVERT(INT, SCOPE_IDENTITY());
-
-    INSERT INTO dbo.BOOKING_DETAIL(booking_id,ticket_id,passenger_full_name,passenger_id_card,price)
-    VALUES (@BookingId,@TicketId,N'Hành khách Demo','DEMO-ID-0001',1200000.00);
-
-    INSERT INTO dbo.INVOICE(booking_id,invoice_date,total,discount_amount,tax_amount,total_amount,status)
-    VALUES (@BookingId,SYSDATETIME(),1200000.00,120000.00,0,1080000.00,'PAID');
-    SET @InvoiceId = CONVERT(INT, SCOPE_IDENTITY());
-
-    INSERT INTO dbo.INVOICE_DETAIL(invoice_id,ticket_id,unit_price,quantity,subtotal)
-    VALUES (@InvoiceId,@TicketId,1200000.00,1,1200000.00);
-
-    /* Current counters must be maintained atomically with ticket/invoice operations. */
-    UPDATE dbo.FLIGHT
-    SET tickets_sold = tickets_sold + 1,
-        seats_available = seats_available - 1,
-        total_revenue = total_revenue + 1080000.00
-    WHERE flight_id = @FlightId AND seats_available >= 1;
-    IF @@ROWCOUNT <> 1 THROW 51002, N'Khong du ghe de cap ve.', 1;
-
-    UPDATE dbo.DISCOUNT_CODE SET used_count = used_count + 1
-    WHERE discount_id = @DiscountId AND (usage_limit IS NULL OR used_count < usage_limit);
-    IF @@ROWCOUNT <> 1 THROW 51003, N'Ma giam gia het luot.', 1;
-
-    /* Round-trip demo flights are part of the original seed. Each journey is
-       two FLIGHT rows; no extra booking, passenger, ticket or invoice is made. */
-    DECLARE @RoundTripNowVN DATETIME2(0) = CONVERT(DATETIME2(0),
-        SYSUTCDATETIME() AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time');
-    DECLARE @RoundTripAirports TABLE (code VARCHAR(3) PRIMARY KEY, airport_id INT NOT NULL);
-    INSERT INTO @RoundTripAirports VALUES
-        ('SGN', @AirportSGN), ('HAN', @AirportHAN), ('DAD', @AirportDAD);
-
-    DECLARE @RoundTripPairs TABLE (code VARCHAR(24) PRIMARY KEY,
-        origin VARCHAR(3), destination VARCHAR(3), outbound_date DATE,
-        return_date DATE, price DECIMAL(18,2));
-    INSERT INTO @RoundTripPairs
-    SELECT 'FINAL-'+CONVERT(varchar(3),n),origin,destination,
-      DATEADD(DAY,10+(n-1)*3,CAST(SYSDATETIME() AS date)),
-      DATEADD(DAY,12+(n-1)*3,CAST(SYSDATETIME() AS date)),price
-    FROM (VALUES
-      (1,'SGN','HAN',1100000),
-      (2,'SGN','HAN',1200000),
-      (3,'DAD','HAN',950000),
-      (4,'SGN','DAD',850000),
-      (5,'SGN','HAN',1250000),
-      (6,'DAD','HAN',1000000),
-      (7,'SGN','DAD',900000),
-      (8,'SGN','HAN',1500000),
-      (9,'SGN','HAN',1300000),
-      (10,'DAD','HAN',1050000),
-      (11,'SGN','DAD',950000)) v(n,origin,destination,price);
-
-    DECLARE @RoundTripLegs TABLE (origin VARCHAR(3), destination VARCHAR(3),
-        flight_date DATE, departure_time TIME(0), arrival_time TIME(0), price DECIMAL(18,2));
-    INSERT INTO @RoundTripLegs
-    SELECT origin,destination,outbound_date,'07:15','09:25',price FROM @RoundTripPairs
-    UNION ALL
-    SELECT destination,origin,return_date,'13:40','15:50',price+50000 FROM @RoundTripPairs;
-
-    INSERT INTO dbo.FLIGHT(departure_airport_id,arrival_airport_id,total_seats,
-        tickets_sold,seats_available,total_revenue,
-        departure_date,departure_time,arrival_date,arrival_time,status)
-    SELECT a.airport_id,b.airport_id,120,0,120,0,
-        l.flight_date,l.departure_time,l.flight_date,l.arrival_time,
-        CASE WHEN DATEADD(MINUTE,DATEPART(HOUR,l.arrival_time)*60+DATEPART(MINUTE,l.arrival_time),
-            CONVERT(DATETIME2(0),l.flight_date)) <= @RoundTripNowVN
-            THEN 'COMPLETED' ELSE 'SCHEDULED' END
-    FROM @RoundTripLegs l
-    JOIN @RoundTripAirports a ON a.code=l.origin
-    JOIN @RoundTripAirports b ON b.code=l.destination;
-    IF @@ROWCOUNT <> 22 THROW 51004, N'Chua tao du 22 chuyen bay khu hoi.', 1;
-
-    INSERT INTO dbo.FARE_CLASS(flight_id,class_name,price,base_baggage_kg)
-    SELECT f.flight_id,x.class_name,x.price,x.baggage
-    FROM @RoundTripLegs l
-    JOIN @RoundTripAirports a ON a.code=l.origin
-    JOIN @RoundTripAirports b ON b.code=l.destination
-    JOIN dbo.FLIGHT f ON f.departure_airport_id=a.airport_id AND f.arrival_airport_id=b.airport_id
-        AND f.departure_date=l.flight_date AND f.departure_time=l.departure_time
-        AND f.arrival_date=l.flight_date AND f.arrival_time=l.arrival_time
-    CROSS APPLY (VALUES (N'Economy',l.price,7),(N'Business',l.price+900000,20))
-        x(class_name,price,baggage);
-    IF @@ROWCOUNT <> 44 THROW 51005, N'Chua tao du 44 hang ve cho cac chuyen khu hoi.', 1;
-
-    COMMIT TRANSACTION;
-
-
-END TRY
-BEGIN CATCH
-    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
-    THROW;
-END CATCH;
-
-GO
--- Adapted expanded demo block
-/*
-  FLIGHT BOOKING DB — EXTENDED FICTIONAL DEMO DATA
-  ------------------------------------------------
-  Requires the schema from 01..03 and the original seed from 04.
-  Intended for demonstration and grading: many flights, customers, web/counter
-  bookings, multiple fare classes, paid/unpaid/cancelled invoices.
-  Run ONCE on a development/demo database. This file uses a transaction and
-  refuses to run twice. It DOES NOT wipe existing data.
-  Everything is fictional; no real passenger information is used.
-*/
-
-
-SET NOCOUNT ON;
-SET XACT_ABORT ON;
-
-BEGIN TRY
-    BEGIN TRANSACTION;
-
-    IF OBJECT_ID(N'dbo.BOOKING_DETAIL', N'U') IS NULL
-       OR OBJECT_ID(N'dbo.INVOICE_DETAIL', N'U') IS NULL
-       OR OBJECT_ID(N'dbo.TICKET', N'U') IS NULL
-       THROW 52001, N'Chua co day du schema. Hay chay cac script 01-03.', 1;
-
-    IF NOT EXISTS (SELECT 1 FROM dbo.DISCOUNT_CODE WHERE code = 'DEMO10')
-       THROW 52002, N'Chua co du lieu goc. Hay chay script 04 truoc.', 1;
-
-    IF EXISTS (SELECT 1 FROM dbo.DISCOUNT_CODE WHERE code = 'EXPAND5')
-       THROW 52003, N'Du lieu mo rong da ton tai. Khong chay lai file 07.', 1;
-
-    /* Add only missing airports; seed 04 now also provides Da Nang. */
-    INSERT INTO dbo.AIRPORT(airport_name,city)
-    SELECT a.airport_name,a.city
-    FROM (VALUES
-        (N'San bay Da Nang',N'Da Nang'),
-        (N'San bay Cam Ranh',N'Khanh Hoa'),
-        (N'San bay Phu Quoc',N'Kien Giang'),
-        (N'San bay Cat Bi',N'Hai Phong'),
-        (N'San bay Phu Bai',N'Hue'),
-        (N'San bay Lien Khuong',N'Lam Dong')) a(airport_name,city)
-    WHERE NOT EXISTS (SELECT 1 FROM dbo.AIRPORT existing
-        WHERE existing.airport_name=a.airport_name AND existing.city=a.city);
-
-    /* 24 fictional customers, all identifiable by reserved demo email pattern. */
-    DECLARE @i INT = 1;
-    WHILE @i <= 24
-    BEGIN
-        INSERT INTO dbo.CUSTOMER(full_name,phone,email,date_of_birth,gender,id_passport_number)
-        VALUES (
-            N'Khach demo ' + RIGHT('00'+CAST(@i AS VARCHAR(2)),2),
-            '0888'+RIGHT('000000'+CAST(@i AS VARCHAR(6)),6),
-            'flight.demo.'+RIGHT('00'+CAST(@i AS VARCHAR(2)),2)+'@example.test',
-            DATEFROMPARTS(1989+(@i%16),1+(@i%12),1+(@i%27)),
-            CASE WHEN @i%2=0 THEN N'Nam' ELSE N'Nu' END,
-            'FICTIONAL-'+RIGHT('0000'+CAST(@i AS VARCHAR(4)),4));
-        SET @i += 1;
-    END;
-
-    /* 6 fictional employees. */
-    SET @i = 1;
-    WHILE @i <= 6
-    BEGIN
-        INSERT INTO dbo.EMPLOYEE(full_name,phone,email,position,hire_date,status)
-        VALUES (
-            N'Nhan vien demo '+CAST(@i AS NVARCHAR(3)),
-            '0777'+RIGHT('000000'+CAST(@i AS VARCHAR(6)),6),
-            'flight.employee.'+CAST(@i AS VARCHAR(3))+'@example.test',
-            CASE WHEN @i <= 4 THEN N'Nhan vien ban ve' ELSE N'Nhan vien quan ly' END,
-            DATEFROMPARTS(2023+(@i%3),1+(@i%10),10),
-            CASE WHEN @i=6 THEN 'INACTIVE' ELSE 'ACTIVE' END);
-        SET @i += 1;
-    END;
-
-    /* More discount cases: percent, fixed, expired, exhausted, future. */
-    INSERT INTO dbo.DISCOUNT_CODE
-       (code,description,discount_type,discount_value,min_order_amount,
-        max_discount_amount,start_date,end_date,usage_limit,used_count,status)
-    VALUES
-       ('EXPAND5',N'Demo: giam 5 phan tram','PERCENT',5,0,200000,DATEFROMPARTS(YEAR(SYSDATETIME())-1,1,1),DATEFROMPARTS(YEAR(SYSDATETIME())+2,12,31),100,0,'ACTIVE'),
-       ('SAVE100',N'Demo: giam 100 nghin','FIXED',100000,500000,NULL,DATEFROMPARTS(YEAR(SYSDATETIME())-1,1,1),DATEFROMPARTS(YEAR(SYSDATETIME())+2,12,31),100,0,'ACTIVE'),
-       ('EXPIRED10',N'Demo: ma het han','PERCENT',10,0,200000,DATEFROMPARTS(YEAR(SYSDATETIME())-2,1,1),DATEFROMPARTS(YEAR(SYSDATETIME())-1,12,31),30,0,'ACTIVE'),
-       ('FULLUSED',N'Demo: ma het luot','FIXED',30000.01,0,NULL,DATEFROMPARTS(YEAR(SYSDATETIME())-1,1,1),DATEFROMPARTS(YEAR(SYSDATETIME())+2,12,31),1,0,'ACTIVE'),
-       ('FUTURE15',N'Demo: ma chua den ngay','PERCENT',15,0,150000,DATEFROMPARTS(YEAR(SYSDATETIME())+2,1,1),DATEFROMPARTS(YEAR(SYSDATETIME())+3,12,31),100,0,'ACTIVE');
-
-    DECLARE @Airports TABLE (rn INT IDENTITY(1,1) PRIMARY KEY, airport_id INT NOT NULL);
-    DECLARE @Customers TABLE (rn INT IDENTITY(1,1) PRIMARY KEY, customer_id INT NOT NULL);
-    DECLARE @Employees TABLE (rn INT IDENTITY(1,1) PRIMARY KEY, employee_id INT NOT NULL);
-
-    INSERT INTO @Airports(airport_id) SELECT airport_id FROM dbo.AIRPORT ORDER BY airport_id;
-    INSERT INTO @Customers(customer_id) SELECT customer_id FROM dbo.CUSTOMER
-       WHERE email LIKE 'flight.demo.%@example.test' ORDER BY customer_id;
-    INSERT INTO @Employees(employee_id) SELECT employee_id FROM dbo.EMPLOYEE
-       WHERE email LIKE 'flight.employee.%@example.test' AND status='ACTIVE' ORDER BY employee_id;
-
-    IF (SELECT COUNT(*) FROM @Airports) < 8
-       OR (SELECT COUNT(*) FROM @Customers) <> 24
-       OR (SELECT COUNT(*) FROM @Employees) < 5
-       THROW 52004, N'Du lieu danh muc demo khong dung so luong du kien.', 1;
-
-    DECLARE @j INT, @p INT, @FlightId INT, @FareEconomy INT, @FareBusiness INT;
-    DECLARE @DepAirport INT, @ArrAirport INT, @FlightDate DATE, @ArrivalDate DATE;
-    DECLARE @DepTime TIME(0), @ArrTime TIME(0), @FlightStatus VARCHAR(20);
-    DECLARE @CustomerId INT, @EmployeeId INT, @BookingId INT, @InvoiceId INT;
-    DECLARE @TicketId INT, @Qty INT, @SeatNo VARCHAR(10);
-    DECLARE @BookingStatus VARCHAR(20), @TicketStatus VARCHAR(20), @InvoiceStatus VARCHAR(20);
-    DECLARE @BookingSource VARCHAR(10), @DiscountId INT, @DiscountAmount DECIMAL(18,2);
-    DECLARE @Subtotal DECIMAL(18,2), @Total DECIMAL(18,2), @Price DECIMAL(18,2);
-    DECLARE @BookingDate DATETIME2(0), @InvoiceDate DATETIME2(0);
-    DECLARE @IssuedTickets INT = 0, @PaidRevenue DECIMAL(18,2) = 0;
-
-    /* 20 flights across all four quarters of 2026, including some upcoming flights. */
-    SET @i = 1;
-    WHILE @i <= 20
-    BEGIN
-        SELECT @DepAirport=airport_id FROM @Airports WHERE rn=((@i-1)%8)+1;
-        SELECT @ArrAirport=airport_id FROM @Airports WHERE rn=((@i+2)%8)+1;
-
-        IF @i <= 16
-            SET @FlightDate=DATEFROMPARTS(YEAR(SYSDATETIME())-1,1+(((@i-1)%4)*3),11+((@i-1)/4)*5);
-        ELSE
-            SET @FlightDate=DATEADD(DAY,14+(@i-17)*10,CAST(SYSDATETIME() AS date));
-
-        IF @i%3=0
-        BEGIN
-            SET @DepTime='23:10:00'; SET @ArrTime='01:20:00';
-            SET @ArrivalDate=DATEADD(DAY,1,@FlightDate);
-        END
-        ELSE
-        BEGIN
-            SET @DepTime='08:30:00'; SET @ArrTime='10:45:00';
-            SET @ArrivalDate=@FlightDate;
-        END;
-
-        SET @FlightStatus=CASE WHEN @i IN (8,12) THEN 'CANCELLED'
-                               WHEN @i<=16 THEN 'COMPLETED' ELSE 'SCHEDULED' END;
-
-        INSERT INTO dbo.FLIGHT
-          (departure_airport_id,arrival_airport_id,total_seats,tickets_sold,
-           seats_available,total_revenue,departure_date,departure_time,
-           arrival_date,arrival_time,status)
-        VALUES (@DepAirport,@ArrAirport,90+(@i%3)*30,0,90+(@i%3)*30,0,
-                @FlightDate,@DepTime,@ArrivalDate,@ArrTime,@FlightStatus);
-        SET @FlightId=CONVERT(INT,SCOPE_IDENTITY());
-
-        INSERT INTO dbo.FARE_CLASS(flight_id,class_name,price,base_baggage_kg)
-        VALUES (@FlightId,N'Economy',900000+(@i%6)*100000,7);
-        SET @FareEconomy=CONVERT(INT,SCOPE_IDENTITY());
-
-        INSERT INTO dbo.FARE_CLASS(flight_id,class_name,price,base_baggage_kg)
-        VALUES (@FlightId,N'Business',1800000+(@i%5)*200000,20);
-        SET @FareBusiness=CONVERT(INT,SCOPE_IDENTITY());
-
-        /* Four bookings per flight; includes WEB/COUNTER, 1-3 passengers.
-           j=4 is cancelled; j=3 is confirmed but unpaid;
-           flights 8 and 12 are fully cancelled. */
-        SET @j=1;
-        WHILE @j<=4
-        BEGIN
-            SET @Qty=CASE WHEN @j=2 THEN 2 WHEN @j=3 THEN 3 ELSE 1 END;
-            SET @BookingSource=CASE WHEN @j IN (1,3) THEN 'WEB' ELSE 'COUNTER' END;
-            SET @BookingStatus=CASE WHEN @j=4 OR @FlightStatus='CANCELLED'
-                                    THEN 'CANCELLED' ELSE 'CONFIRMED' END;
-            SET @TicketStatus=CASE WHEN @BookingStatus='CANCELLED' THEN 'CANCELLED' ELSE 'ISSUED' END;
-            SET @InvoiceStatus=CASE WHEN @BookingStatus='CANCELLED' THEN 'CANCELLED'
-                                    WHEN @j=3 THEN 'UNPAID' ELSE 'PAID' END;
-            SET @BookingDate=DATEADD(HOUR,9,DATEADD(DAY,-7,CAST(@FlightDate AS DATETIME2(0))));
-            IF @BookingDate>SYSDATETIME() SET @BookingDate=DATEADD(HOUR,-@j,SYSDATETIME());
-            SET @InvoiceDate=@BookingDate;
-
-            SELECT @CustomerId=customer_id FROM @Customers WHERE rn=((@i+@j-2)%24)+1;
-            SET @EmployeeId=NULL;
-            IF @BookingSource='COUNTER'
-                SELECT @EmployeeId=employee_id FROM @Employees WHERE rn=((@i+@j-2)%5)+1;
-
-            SET @DiscountId=NULL;
-            IF @j=2 AND @BookingStatus='CONFIRMED'
-                SELECT @DiscountId=discount_id FROM dbo.DISCOUNT_CODE WHERE code=CASE WHEN @i=1 THEN 'FULLUSED' ELSE 'SAVE100' END;
-            IF @j=3 AND @BookingStatus='CONFIRMED'
-                SELECT @DiscountId=discount_id FROM dbo.DISCOUNT_CODE WHERE code='EXPAND5';
-
-            SET @Subtotal=0;
-            SET @Price=CASE WHEN @j=3 THEN 1800000+(@i%5)*200000
-                             ELSE 900000+(@i%6)*100000 END;
-            SET @Subtotal=@Price*@Qty;
-            SET @DiscountAmount=CASE WHEN @j=2 AND @BookingStatus='CONFIRMED' THEN CASE WHEN @i=1 THEN 30000.01 ELSE 100000 END
-                                      WHEN @j=3 AND @BookingStatus='CONFIRMED' THEN ROUND(@Subtotal*0.05,2)
-                                      ELSE 0 END;
-            SET @Total=@Subtotal-@DiscountAmount;
-
-            INSERT INTO dbo.BOOKING
-              (customer_id,employee_id,flight_id,discount_id,booking_date,
-               booking_source,ticket_quantity,discount_amount,total_amount,status)
-            VALUES (@CustomerId,@EmployeeId,@FlightId,@DiscountId,@BookingDate,
-                    @BookingSource,@Qty,@DiscountAmount,@Total,@BookingStatus);
-            SET @BookingId=CONVERT(INT,SCOPE_IDENTITY());
-
-            INSERT INTO dbo.INVOICE
-              (booking_id,invoice_date,total,discount_amount,tax_amount,total_amount,status)
-            VALUES (@BookingId,@InvoiceDate,@Subtotal,@DiscountAmount,0,@Total,@InvoiceStatus);
-            SET @InvoiceId=CONVERT(INT,SCOPE_IDENTITY());
-
-            SET @p=1;
-            WHILE @p<=@Qty
-            BEGIN
-                /* Seat number is unique within each flight, including cancelled history. */
-                SET @SeatNo=CAST(((@j-1)*3)+@p AS VARCHAR(4))+'A';
-                INSERT INTO dbo.TICKET(flight_id,fare_id,seat_number,issued_at,status)
-                VALUES (@FlightId,CASE WHEN @j=3 THEN @FareBusiness ELSE @FareEconomy END,
-                        @SeatNo,@BookingDate,@TicketStatus);
-                SET @TicketId=CONVERT(INT,SCOPE_IDENTITY());
-
-                INSERT INTO dbo.BOOKING_DETAIL
-                    (booking_id,ticket_id,passenger_full_name,passenger_id_card,price)
-                VALUES (@BookingId,@TicketId,
-                        N'Hanh khach gia lap '+CAST(@i AS NVARCHAR(3))+N'-'+CAST(@j AS NVARCHAR(3))+N'-'+CAST(@p AS NVARCHAR(3)),
-                        'DEMO-'+CAST(@FlightId AS VARCHAR(6))+'-'+CAST(@j AS VARCHAR(3))+'-'+CAST(@p AS VARCHAR(3)),@Price);
-
-                INSERT INTO dbo.INVOICE_DETAIL(invoice_id,ticket_id,unit_price,quantity,subtotal)
-                VALUES (@InvoiceId,@TicketId,@Price,1,@Price);
-                SET @p+=1;
-            END;
-
-            IF @BookingStatus='CONFIRMED'
-            BEGIN
-                UPDATE dbo.FLIGHT
-                   SET tickets_sold=tickets_sold+@Qty,
-                       seats_available=seats_available-@Qty
-                 WHERE flight_id=@FlightId AND seats_available>=@Qty;
-                IF @@ROWCOUNT<>1 THROW 52005, N'Khong du ghe de ban khi seed.',1;
-                SET @IssuedTickets+=@Qty;
-
-                IF @DiscountId IS NOT NULL
-                BEGIN
-                    UPDATE dbo.DISCOUNT_CODE SET used_count=used_count+1
-                    WHERE discount_id=@DiscountId
-                      AND (usage_limit IS NULL OR used_count<usage_limit);
-                    IF @@ROWCOUNT<>1 THROW 52006, N'Ma giam gia da het luot khi seed.',1;
-                END;
-            END;
-
-            IF @InvoiceStatus='PAID'
-            BEGIN
-                UPDATE dbo.FLIGHT SET total_revenue=total_revenue+@Total
-                WHERE flight_id=@FlightId;
-                SET @PaidRevenue+=@Total;
-            END;
-            SET @j+=1;
-        END;
-        SET @i+=1;
-    END;
-
-    /* Assert consistency before COMMIT. */
-    IF EXISTS (
-        SELECT 1 FROM dbo.FLIGHT f
-        WHERE f.tickets_sold <> (
-            SELECT COUNT(*) FROM dbo.TICKET t
-            WHERE t.flight_id=f.flight_id AND t.status='ISSUED'
-        )
-    ) THROW 52007, N'So ve ban khong khop voi TICKET.',1;
-
-    IF EXISTS (
-        SELECT 1 FROM dbo.FLIGHT f
-        WHERE f.total_revenue <> ISNULL((
-            SELECT SUM(inv.total_amount)
-            FROM dbo.INVOICE inv
-            JOIN dbo.BOOKING b ON b.booking_id=inv.booking_id
-            WHERE b.flight_id=f.flight_id AND inv.status='PAID'
-        ),0)
-    ) THROW 52008, N'Doanh thu FLIGHT khong khop INVOICE PAID.',1;
-
-    IF EXISTS (
-        SELECT 1 FROM dbo.BOOKING b
-        WHERE b.ticket_quantity <> (SELECT COUNT(*) FROM dbo.BOOKING_DETAIL bd WHERE bd.booking_id=b.booking_id)
-    ) THROW 52009, N'So hanh khach khong khop BOOKING.ticket_quantity.',1;
-
-    COMMIT TRANSACTION;
-
-
-END TRY
-BEGIN CATCH
-    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
-    THROW;
-END CATCH;
-
-
-GO
-
--- Store hashes only in SQL. Private synthetic demo lookup keys are returned only
--- after COMMIT; direct sqlcmd output to an ignored LOCAL file, never Git/Docs.
-DECLARE @LookupKeys TABLE(booking_id int PRIMARY KEY,lookup_key varchar(64) NOT NULL);
-INSERT @LookupKeys SELECT booking_id,CONVERT(varchar(64),CRYPT_GEN_RANDOM(32),2)
-FROM dbo.BOOKING WHERE booking_source='WEB';
-INSERT dbo.BOOKING_WEB_REQUEST(request_hash,payload_hash,booking_id)
-SELECT CONVERT(char(64),HASHBYTES('SHA2_256',lookup_key),2),
- CONVERT(char(64),HASHBYTES('SHA2_256',CONCAT('FINAL-DEMO-PAYLOAD:',booking_id)),2),booking_id FROM @LookupKeys;
-IF (SELECT COUNT_BIG(*) FROM dbo.[AIRPORT])<>8
- OR (SELECT COUNT_BIG(*) FROM dbo.[CUSTOMER])<>25
- OR (SELECT COUNT_BIG(*) FROM dbo.[EMPLOYEE])<>7
- OR (SELECT COUNT_BIG(*) FROM dbo.[DISCOUNT_CODE])<>6
- OR (SELECT COUNT_BIG(*) FROM dbo.[FLIGHT])<>43
- OR (SELECT COUNT_BIG(*) FROM dbo.[FARE_CLASS])<>85
- OR (SELECT COUNT_BIG(*) FROM dbo.[TICKET])<>141
- OR (SELECT COUNT_BIG(*) FROM dbo.[BOOKING])<>81
- OR (SELECT COUNT_BIG(*) FROM dbo.[BOOKING_DETAIL])<>141
- OR (SELECT COUNT_BIG(*) FROM dbo.[INVOICE])<>81
- OR (SELECT COUNT_BIG(*) FROM dbo.[INVOICE_DETAIL])<>141
- OR (SELECT COUNT_BIG(*) FROM dbo.[BOOKING_WEB_REQUEST])<>41
- THROW 51257,'Final seed count mismatch; whole seed remains uncommitted.',1;
-EXEC sys.sp_addextendedproperty @name=N'BookingFlight.FinalSeed',@value=N'DEMO_8_25_7_6_43_85_81_141';
+-- Fictional fixtures. ASCII request fields keep the System.Text.Json wire contract
+-- reproducible in SQL; unused catalogue rows also exercise Vietnamese Unicode.
+DECLARE @Today date=CONVERT(date,SYSUTCDATETIME() AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time');
+DECLARE @Airports TABLE(n int PRIMARY KEY,id int);
+DECLARE @Customers TABLE(n int PRIMARY KEY,id int);
+DECLARE @Employees TABLE(n int PRIMARY KEY,id int);
+DECLARE @Discounts TABLE(n int PRIMARY KEY,id int);
+DECLARE @Flights TABLE(n int PRIMARY KEY,id int,fare int,day date);
+DECLARE @Bookings TABLE(n int PRIMARY KEY,id int,flight_n int);
+DECLARE @LookupKeys TABLE(booking_id int PRIMARY KEY,lookup_key varchar(64),payload varchar(max));
+DECLARE @i int=1,@id int,@name nvarchar(150),@city nvarchar(100);
+WHILE @i<=15
+BEGIN
+ SELECT @name=ten,@city=thanhPho FROM (VALUES
+ (1,N'Sân bay Tân Sơn Nhất',N'TP. Hồ Chí Minh'),(2,N'Sân bay Nội Bài',N'Hà Nội'),
+ (3,N'Sân bay Đà Nẵng',N'Đà Nẵng'),(4,N'Sân bay Phú Quốc',N'Kiên Giang'),
+ (5,N'Sân bay Cam Ranh',N'Khánh Hòa'),(6,N'Sân bay Cát Bi',N'Hải Phòng'),
+ (7,N'Sân bay Phú Bài',N'Huế'),(8,N'Sân bay Liên Khương',N'Lâm Đồng'),
+ (9,N'Sân bay Vinh',N'Nghệ An'),(10,N'Sân bay Cần Thơ',N'Cần Thơ'),
+ (11,N'Sân bay Buôn Ma Thuột',N'Đắk Lắk'),(12,N'Sân bay Pleiku',N'Gia Lai'),
+ (13,N'Sân bay Chu Lai',N'Quảng Nam'),(14,N'Sân bay Tuy Hòa',N'Phú Yên'),
+ (15,N'Sân bay Đồng Hới',N'Quảng Bình')) a(n,ten,thanhPho) WHERE n=@i;
+ INSERT dbo.AIRPORT(airport_name,city) VALUES(@name,@city);
+ INSERT @Airports VALUES(@i,CONVERT(int,SCOPE_IDENTITY())); SET @i+=1;
+END;
+SET @i=1;
+WHILE @i<=50
+BEGIN
+ INSERT dbo.CUSTOMER(full_name,phone,email,date_of_birth,gender,id_passport_number)
+ VALUES(CASE WHEN @i<=22 THEN N'Khach demo '+CONVERT(nvarchar(3),@i) ELSE N'Khách hàng giả lập '+CONVERT(nvarchar(3),@i) END,
+ '09000'+RIGHT('00000'+CONVERT(varchar(5),@i),5),'final.customer.'+CONVERT(varchar(3),@i)+'@example.test',
+ '1990-05-10',CASE WHEN @i%2=0 THEN N'Nu' ELSE N'Nam' END,'FINAL-C'+CONVERT(varchar(3),@i));
+ INSERT @Customers VALUES(@i,CONVERT(int,SCOPE_IDENTITY())); SET @i+=1;
+END;
+SET @i=1;
+WHILE @i<=15
+BEGIN
+ INSERT dbo.EMPLOYEE(full_name,phone,email,position,hire_date,status)
+ VALUES(N'Nhân viên giả lập '+CONVERT(nvarchar(3),@i),'09100'+RIGHT('00000'+CONVERT(varchar(5),@i),5),
+ 'final.employee.'+CONVERT(varchar(3),@i)+'@example.test',N'Nhân viên bán vé','2024-01-01',CASE WHEN @i=15 THEN 'INACTIVE' ELSE 'ACTIVE' END);
+ INSERT @Employees VALUES(@i,CONVERT(int,SCOPE_IDENTITY())); SET @i+=1;
+END;
+SET @i=1;
+WHILE @i<=15
+BEGIN
+ INSERT dbo.DISCOUNT_CODE(code,description,discount_type,discount_value,min_order_amount,max_discount_amount,start_date,end_date,usage_limit,used_count,status)
+ VALUES('FINAL'+RIGHT('00'+CONVERT(varchar(2),@i),2),N'Mã giảm giá giả lập '+CONVERT(nvarchar(3),@i),
+ CASE WHEN @i%2=0 THEN 'PERCENT' ELSE 'FIXED' END,CASE WHEN @i%2=0 THEN 10 ELSE 50000 END,
+ 0,CASE WHEN @i%2=0 THEN 200000 ELSE NULL END,
+ CASE WHEN @i=5 THEN DATEADD(day,30,@Today) ELSE CONVERT(date,'20240101') END,
+ CASE WHEN @i=4 THEN DATEADD(day,-1,@Today) ELSE DATEADD(year,3,@Today) END,
+ CASE WHEN @i=3 THEN 1 ELSE 500 END,0,CASE WHEN @i=6 THEN 'INACTIVE' ELSE 'ACTIVE' END);
+ INSERT @Discounts VALUES(@i,CONVERT(int,SCOPE_IDENTITY())); SET @i+=1;
+END;
+DECLARE @pair int,@from int,@to int,@day date,@seats int,@fare int,@price decimal(18,2);
+SET @i=1;
+WHILE @i<=43
+BEGIN
+ SET @pair=(@i-1)/2;
+ SELECT @from=id FROM @Airports WHERE n=1+(@pair%3);
+ SELECT @to=id FROM @Airports WHERE n=1+((@pair+1)%3);
+ IF @i%2=0 BEGIN SET @id=@from; SET @from=@to; SET @to=@id; END;
+ SET @day=CASE WHEN @i<=20 THEN DATEFROMPARTS(YEAR(@Today)-1+((@pair/4)%2),1+(@pair%4)*3,10+(@pair/4)*3)
+               ELSE DATEADD(day,14+(@pair-10)*7,@Today) END;
+ IF @i%2=0 SET @day=DATEADD(day,3,@day);
+ SET @seats=CASE WHEN @i=31 THEN 2 WHEN @i=32 THEN 3 ELSE 120 END;
+ INSERT dbo.FLIGHT(departure_airport_id,arrival_airport_id,total_seats,tickets_sold,seats_available,total_revenue,departure_date,departure_time,arrival_date,arrival_time,status)
+ VALUES(@from,@to,@seats,0,@seats,0,@day,'08:00',@day,'10:15',
+ CASE WHEN @i BETWEEN 33 AND 40 THEN 'CANCELLED' WHEN @day<@Today THEN 'COMPLETED' ELSE 'SCHEDULED' END);
+ SET @id=CONVERT(int,SCOPE_IDENTITY()); SET @price=900000+(@pair%5)*100000;
+ INSERT dbo.FARE_CLASS(flight_id,class_name,price,base_baggage_kg) VALUES(@id,N'Economy',@price,7);
+ SET @fare=CONVERT(int,SCOPE_IDENTITY()); INSERT @Flights VALUES(@i,@id,@fare,@day);
+ INSERT dbo.FARE_CLASS(flight_id,class_name,price,base_baggage_kg) VALUES(@id,N'Premium',@price+500000,15),(@id,N'Business',@price+1500000,25);
+ SET @i+=1;
+END;
+DECLARE @n int=1,@fn int,@flight int,@customer int,@employee int,@discount int,@code varchar(50),@qty int,
+ @state varchar(20),@invoiceState varchar(20),@source varchar(10),@sub decimal(18,2),@off decimal(18,2),
+ @booking int,@invoice int,@ticket int,@p int,@bookDate datetime2(0),@person int;
+WHILE @n<=81
+BEGIN
+ SET @fn=CASE WHEN @n=81 THEN 43 ELSE (@n+1)/2 END;
+ SELECT @flight=id,@fare=fare,@day=day FROM @Flights WHERE n=@fn;
+ SET @person=(@fn-1)/2+1; SELECT @customer=id FROM @Customers WHERE n=@person;
+ SELECT @employee=id FROM @Employees WHERE n=1+(@fn%10);
+ SET @source=CASE WHEN @n%2=1 THEN 'WEB' ELSE 'COUNTER' END;
+ IF @source='WEB' SET @employee=NULL;
+ SET @qty=CASE WHEN @n<=60 THEN 2 ELSE 1 END;
+ SET @invoiceState=CASE WHEN @fn<=20 THEN 'PAID' WHEN @fn<=32 OR @n=81 THEN 'UNPAID' ELSE 'CANCELLED' END;
+ SET @state=CASE WHEN @invoiceState='CANCELLED' THEN 'CANCELLED' ELSE 'CONFIRMED' END;
+ -- Historical prices deliberately differ from current catalogue prices.
+ SELECT @price=price-10000 FROM dbo.FARE_CLASS WHERE fare_id=@fare;
+ SET @sub=@price*@qty; SET @off=50000;
+ SELECT @discount=id FROM @Discounts WHERE n=CASE WHEN @n=2 THEN 3 ELSE 1 END;
+ -- A WEB round trip consumes the discount once, on its outbound leg only.
+ IF @source='WEB' AND @fn%2=0 BEGIN SET @discount=NULL; SET @off=0; END;
+ SET @bookDate=DATEADD(day,-7,CONVERT(datetime2(0),@day));
+ IF @bookDate>CONVERT(datetime2(0),@Today) SET @bookDate=CONVERT(datetime2(0),@Today);
+ INSERT dbo.BOOKING(customer_id,employee_id,flight_id,discount_id,booking_date,booking_source,ticket_quantity,discount_amount,total_amount,status)
+ VALUES(@customer,@employee,@flight,@discount,@bookDate,@source,@qty,@off,@sub-@off,@state);
+ SET @booking=CONVERT(int,SCOPE_IDENTITY()); INSERT @Bookings VALUES(@n,@booking,@fn);
+ INSERT dbo.INVOICE(booking_id,invoice_date,total,discount_amount,tax_amount,total_amount,status)
+ VALUES(@booking,@bookDate,@sub,@off,0,@sub-@off,@invoiceState);
+ SET @invoice=CONVERT(int,SCOPE_IDENTITY()); SET @p=1;
+ WHILE @p<=@qty
+ BEGIN
+  INSERT dbo.TICKET(flight_id,fare_id,seat_number,issued_at,status)
+  VALUES(@flight,@fare,CONVERT(varchar(3),((CASE WHEN @n%2=1 THEN @p ELSE @qty+@p END)-1)/6+1)+CHAR(65+((CASE WHEN @n%2=1 THEN @p ELSE @qty+@p END)-1)%6),@bookDate,CASE WHEN @state='CANCELLED' THEN 'CANCELLED' ELSE 'ISSUED' END);
+  SET @ticket=CONVERT(int,SCOPE_IDENTITY());
+  INSERT dbo.BOOKING_DETAIL(booking_id,ticket_id,passenger_full_name,passenger_id_card,price)
+  VALUES(@booking,@ticket,N'Hanh khach '+CONVERT(nvarchar(3),@person)+N'-'+CONVERT(nvarchar(2),@p),
+  'FINAL-P'+CONVERT(varchar(3),@person)+'-'+CONVERT(varchar(2),@p),@price);
+  INSERT dbo.INVOICE_DETAIL(invoice_id,ticket_id,unit_price,quantity,subtotal) VALUES(@invoice,@ticket,@price,1,@price);
+  SET @p+=1;
+ END;
+ SET @n+=1;
+END;
+UPDATE f SET tickets_sold=s.qty,seats_available=f.total_seats-s.qty,total_revenue=r.revenue
+ FROM dbo.FLIGHT f CROSS APPLY(SELECT COUNT(*) qty FROM dbo.TICKET t WHERE t.flight_id=f.flight_id AND t.status='ISSUED') s
+ CROSS APPLY(SELECT COALESCE(SUM(i.total_amount),0) revenue FROM dbo.INVOICE i JOIN dbo.BOOKING b ON b.booking_id=i.booking_id WHERE b.flight_id=f.flight_id AND i.status='PAID') r;
+UPDATE d SET used_count=(SELECT COUNT(*) FROM dbo.BOOKING b WHERE b.discount_id=d.discount_id AND b.status='CONFIRMED') FROM dbo.DISCOUNT_CODE d;
+
+-- 20 genuine WEB round trips (same customer/passengers/payload) and one one-way.
+-- Serialization field order matches DatVeBUS.NoiDungChongGuiLap; hash UTF-8,
+-- not SQL nvarchar UTF-16. No random payload fingerprints.
+DECLARE @key varchar(64),@hash char(64),@payload varchar(max),@contact varchar(max),@passengers varchar(max),
+ @returnId int,@returnFlight int,@returnFare int,@returnDay date,@outBooking int;
+SET @n=1;
+WHILE @n<=81
+BEGIN
+ SELECT @outBooking=id,@fn=flight_n FROM @Bookings WHERE n=@n;
+ SELECT @flight=id,@fare=fare FROM @Flights WHERE n=@fn;
+ SET @returnId=NULL; SET @returnFlight=NULL; SET @returnFare=NULL; SET @returnDay=NULL;
+ IF @n<81
+ BEGIN
+  SELECT @returnId=id FROM @Bookings WHERE n=@n+2;
+  SELECT @returnFlight=id,@returnFare=fare,@returnDay=day FROM @Flights WHERE n=@fn+1;
+ END;
+ SELECT @qty=ticket_quantity,@customer=customer_id,@discount=discount_id FROM dbo.BOOKING WHERE booking_id=@outBooking;
+ SELECT @code=code FROM dbo.DISCOUNT_CODE WHERE discount_id=@discount;
+ SELECT @contact=(SELECT full_name FullName,phone Phone,email Email,CONVERT(char(10),date_of_birth,23) DateOfBirth,gender Gender,id_passport_number IdPassportNumber
+ FROM dbo.CUSTOMER WHERE customer_id=@customer FOR JSON PATH,WITHOUT_ARRAY_WRAPPER);
+ SELECT @passengers=(SELECT passenger_full_name FullName,passenger_id_card IdCard FROM dbo.BOOKING_DETAIL WHERE booking_id=@outBooking ORDER BY booking_detail_id FOR JSON PATH);
+ SET @payload=CONCAT('{"FlightId":',@flight,',"FareId":',@fare,',"Quantity":',@qty,',"TripType":"',CASE WHEN @returnId IS NULL THEN 'OneWay' ELSE 'RoundTrip' END,
+ '","ReturnDate":',CASE WHEN @returnId IS NULL THEN 'null' ELSE '"'+CONVERT(char(10),@returnDay,23)+'"' END,
+ ',"ReturnFlightId":',COALESCE(CONVERT(varchar(12),@returnFlight),'null'),',"ReturnFareId":',COALESCE(CONVERT(varchar(12),@returnFare),'null'),
+ ',"Customer":',@contact,',"Passengers":',@passengers,',"DiscountCode":"',@code,'"}');
+ SET @key=CONVERT(varchar(64),CRYPT_GEN_RANDOM(32),2);
+ SET @hash=CONVERT(char(64),HASHBYTES('SHA2_256',@payload),2);
+ INSERT dbo.BOOKING_WEB_REQUEST(request_hash,payload_hash,booking_id)
+ VALUES(CONVERT(char(64),HASHBYTES('SHA2_256',@key),2),@hash,@outBooking);
+ INSERT @LookupKeys VALUES(@outBooking,@key,@payload);
+ IF @returnId IS NOT NULL
+ BEGIN
+  INSERT dbo.BOOKING_WEB_REQUEST(request_hash,payload_hash,booking_id)
+  VALUES(CONVERT(char(64),HASHBYTES('SHA2_256',CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(varchar(71),'return:'+@key)),2)),2),@hash,@returnId);
+ END;
+ SET @n+=4;
+END;
+IF (SELECT COUNT(*) FROM dbo.AIRPORT)<>15 OR (SELECT COUNT(*) FROM dbo.CUSTOMER)<>50
+ OR (SELECT COUNT(*) FROM dbo.EMPLOYEE)<>15 OR (SELECT COUNT(*) FROM dbo.DISCOUNT_CODE)<>15
+ OR (SELECT COUNT(*) FROM dbo.FLIGHT)<>43 OR (SELECT COUNT(*) FROM dbo.FARE_CLASS)<>129
+ OR (SELECT COUNT(*) FROM dbo.BOOKING)<>81 OR (SELECT COUNT(*) FROM dbo.TICKET)<>141
+ OR (SELECT COUNT(*) FROM dbo.BOOKING_DETAIL)<>141 OR (SELECT COUNT(*) FROM dbo.INVOICE)<>81
+ OR (SELECT COUNT(*) FROM dbo.INVOICE_DETAIL)<>141 OR (SELECT COUNT(*) FROM dbo.BOOKING_WEB_REQUEST)<>41
+ THROW 51257,'Final seed counts differ; seed must roll back.',1;
+IF (SELECT COUNT(*) FROM dbo.INVOICE WHERE status='PAID')<>40
+ OR (SELECT COUNT(*) FROM dbo.INVOICE WHERE status='UNPAID')<>25
+ OR (SELECT COUNT(*) FROM dbo.INVOICE WHERE status='CANCELLED')<>16
+ THROW 51260,'Invoice status distribution differs.',1;
+EXEC sys.sp_addextendedproperty @name=N'BookingFlight.FinalSeed',@value=N'DEMO_15_50_15_15_43_129_81_141';
 :r Database/Final/03_Verify_ReadOnly.sql
-IF @@TRANCOUNT<>1 THROW 51258,'Unexpected seed transaction depth. Stop.',1;
+IF @@TRANCOUNT<>1 THROW 51258,'Unexpected transaction depth.',1;
 COMMIT TRANSACTION;
-PRINT 'PASS: Final demo seed committed once; schema/row counts/business consistency verified.';
-SELECT k.booking_id,i.status,i.total_amount,k.lookup_key AS PRIVATE_DEMO_LOOKUP_KEY
-FROM @LookupKeys k JOIN dbo.INVOICE i ON i.booking_id=k.booking_id ORDER BY k.booking_id;
+PRINT 'PASS: Final seed committed; 20 round trips and one one-way WEB journey.';
+SELECT booking_id,lookup_key AS PRIVATE_DEMO_LOOKUP_KEY,payload AS PRIVATE_DEMO_PAYLOAD FROM @LookupKeys ORDER BY booking_id;

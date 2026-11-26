@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model FlightBooking.Web.Pages.Booking.CheckoutModel
 @{ ViewData["Title"] = "Thông tin đặt vé"; }
 
@@ -30,13 +30,15 @@
         <p class="muted">Đã chọn @Model.Input.Quantity người. Muốn đổi số người, dùng nút lưu thông tin và quay lại form tìm chuyến.</p>
         @for (var i = 0; i < Model.Input.Passengers.Count; i++)
         {
-            <fieldset class="passenger-card"><legend>Hành khách @(i + 1)</legend><div class="form-grid">
+            <fieldset class="passenger-card"><legend>Hành khách @(i + 1)</legend>
+              <p>Ghế dự kiến lượt đi: @(Model.Input.Seats?.ElementAtOrDefault(i) ?? "Chưa có")
+              @if(Model.Input.TripType=="RoundTrip"){<span> · Lượt về: @(Model.Input.ReturnSeats?.ElementAtOrDefault(i) ?? "Chưa có")</span>}</p><div class="form-grid">
                 <div><label asp-for="Input.Passengers[i].FullName">Họ và tên theo giấy tờ</label><input asp-for="Input.Passengers[i].FullName" required /><span asp-validation-for="Input.Passengers[i].FullName"></span></div>
                 <div><label asp-for="Input.Passengers[i].IdCard">CCCD / hộ chiếu</label><input asp-for="Input.Passengers[i].IdCard" maxlength="50" required /><span asp-validation-for="Input.Passengers[i].IdCard"></span></div>
             </div>
             </fieldset>
         }
-        <p class="muted">Danh sách này dùng cho cả hai lượt khi đặt khứ hồi. Ghế được tự động cấp khi xác nhận; chưa hỗ trợ chọn vị trí trên sơ đồ máy bay.</p>
+        <p class="muted">Danh sách này dùng cho cả hai lượt khi đặt khứ hồi. Ghế dự kiến được giữ đúng khi xác nhận nếu còn trống. Nếu ghế vừa được đặt, hãy tính lại giá để xem/chấp thuận ghế mới; hệ thống không âm thầm đổi ghế.</p>
         </section>
     </div>
     <aside><section class="panel summary"><h2>Hành trình của bạn</h2>

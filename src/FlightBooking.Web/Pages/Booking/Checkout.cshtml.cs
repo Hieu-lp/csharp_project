@@ -1,4 +1,4 @@
-using FlightBooking.BUS;
+﻿using FlightBooking.BUS;
 using FlightBooking.DTO;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -35,11 +35,12 @@ public class CheckoutModel : PageModel
             Input.ReturnDate = returnDate; Input.ReturnFlightId = returnFlightId; Input.ReturnFareId = returnFareId;
             DatVeBUS.ChuanHoaHanhTrinh(Input);
             DatVeBUS.DieuChinhSoHanhKhach(Input, quantity);
-            if (luaChonCu != ChuoiHanhTrinh(Input)) { banNhap.AccessKey = DatVeBUS.TaoKhoaTraCuu(); banNhap.AppliedDiscountState = null; }
+            if (luaChonCu != ChuoiHanhTrinh(Input)) { banNhap.AccessKey = DatVeBUS.TaoKhoaTraCuu(); banNhap.AppliedDiscountState = null; Input.Seats=null; Input.ReturnSeats=null; }
             DraftId = banNhap.Id;
             banNhap.Luu(HttpContext.Session);
             Quote = nghiepVu.TinhGiaHanhTrinh(Input);
             Input.ExpectedTotal = Quote.TongTien;
+            if(Input.Seats==null) XemGheTuDong();
             if (banNhap.AppliedDiscountState != TrangThaiGiamGia(Input, Quote)) banNhap.AppliedDiscountState = null;
             banNhap.Luu(HttpContext.Session);
         }
@@ -76,6 +77,10 @@ public class CheckoutModel : PageModel
             if (banNhap is null || ChuoiHanhTrinh(Input) != ChuoiHanhTrinh(banNhap.Request) || Input.Passengers is null || Input.Passengers.Count != banNhap.Request.Quantity)
                 throw new LoiDatVe("Biểu mẫu đã hết phiên hoặc số hành khách/hành trình không khớp. Hãy chọn chuyến lại.");
             if (banNhap.CompletedBookingId is int maDaDat) return RedirectToPage("Details", new { id = maDaDat });
+            // Ghế WEB lấy từ bản nháp đã hiển thị, không tin hidden input của client.
+            Input.Seats=banNhap.Request.Seats;Input.ReturnSeats=banNhap.Request.ReturnSeats;
+            if(action=="book" && (Input.Seats?.Count!=Input.Quantity || (Input.TripType=="RoundTrip" && Input.ReturnSeats?.Count!=Input.Quantity)))
+                throw new LoiDatVe("Hãy xem lại giá/ghế dự kiến trước khi xác nhận.");
             banNhap.Request = Input;
             banNhap.Luu(HttpContext.Session);
             if (action == "back")
@@ -124,6 +129,7 @@ public class CheckoutModel : PageModel
     {
         // Nhận giá từ BUS; PageModel không tự tính giá hoặc cập nhật số ghế.
         Quote = nghiepVu.TinhGiaHanhTrinh(Input);
+        XemGheTuDong();
         Input.ExpectedTotal = Quote.TongTien;
         ModelState.Remove("Input.ExpectedTotal");
         if (Quote.LuotDi.MaGiamGia is not null)
@@ -135,6 +141,13 @@ public class CheckoutModel : PageModel
         else DiscountMessage = "Đã cập nhật giá, không áp dụng mã giảm giá.";
         banNhap.Luu(HttpContext.Session);
         return Page();
+    }
+
+    private void XemGheTuDong()
+    {
+        var di=nghiepVu.DocGheTrong(Input.FlightId,Input.Quantity).Take(Input.Quantity).ToList();
+        var ve=Input.ReturnFlightId.HasValue?nghiepVu.DocGheTrong(Input.ReturnFlightId.Value,Input.Quantity).Take(Input.Quantity).ToList():null;
+        Input.Seats=di;Input.ReturnSeats=ve;
     }
 
     private IActionResult XacNhanDatVe(DatVeTam banNhap)

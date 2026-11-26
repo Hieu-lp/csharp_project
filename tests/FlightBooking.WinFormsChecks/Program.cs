@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Reflection;
 using FlightBooking.BUS;
 using FlightBooking.DTO;
@@ -23,7 +23,10 @@ internal static class Program
         bool dropdownOnly = args.Contains("--dropdown-only");
         bool sqlSync = args.Contains("--sql-sync");
         bool pdfOnly = args.Contains("--pdf-only");
-        if (!sqlSync && !dropdownOnly && !pdfOnly && string.IsNullOrWhiteSpace(connection))
+        bool counterOnly = args.Contains("--counter-only");
+        bool statsReadOnly = args.Contains("--stats-readonly");
+        bool counterReadOnly = args.Contains("--counter-readonly");
+        if (!sqlSync && !dropdownOnly && !pdfOnly && !counterOnly && !counterReadOnly && !statsReadOnly && string.IsNullOrWhiteSpace(connection))
             throw new InvalidOperationException("Set FLIGHTBOOKING_UI_READ_CONNECTION; checks only read existing data.");
         ApplicationConfiguration.Initialize();
         System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("vi-VN");
@@ -32,6 +35,9 @@ internal static class Program
         {
             try
             {
+                if (statsReadOnly) { await StatsLayoutChecks.Run(host, Check); return; }
+                if (counterReadOnly) { CounterReadChecks.Run(host, Check); return; }
+                if (counterOnly) { CounterFormChecks.Run(Check); return; }
                 if (sqlSync) { await SqlSyncChecks.Run(host, Check); return; }
                 if (pdfOnly) { PdfExportChecks.Run(Check); return; }
                 if (args.Contains("--quan-readonly")) { await QuanReadOnlyChecks.Run(host, connection!, Check); return; }

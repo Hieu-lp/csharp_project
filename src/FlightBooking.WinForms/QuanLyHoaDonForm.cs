@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using FlightBooking.BUS;
 using FlightBooking.DTO;
 
@@ -13,6 +13,7 @@ public sealed class QuanLyHoaDonForm : Form
 {
     private readonly HoaDonBUS bus = new();
     private ArrayList danhSachGoc = new();
+    private readonly BoLocNangCao locNangCao = new(["Mã hóa đơn|MaHoaDon", "Mã đặt vé|MaDatVe", "Ngày lập|NgayHoaDon", "Khách hàng|TenKhachHang", "Chuyến bay|MaChuyenBay", "Tổng tiền|TongTien", "Tiền giảm|TienGiam", "Số vé|SoLuongVe", "Trạng thái|TrangThai"]);
     private HoaDonDTO? hoaDonDangChon;
 
     // Vùng tìm kiếm
@@ -102,7 +103,19 @@ public sealed class QuanLyHoaDonForm : Form
             Margin = new Padding(3, 0, 3, 12)
         };
         khungChinh.Controls.Add(tieuDe, 0, 0);
-        khungChinh.Controls.Add(TaoVungTimKiem(), 0, 1);
+        var vungTim = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, RowCount = 2 };
+        vungTim.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        vungTim.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        vungTim.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        vungTim.Controls.Add(TaoVungTimKiem(), 0, 0);
+        var nutNangCao = new CheckBox { Text = "Tìm kiếm nâng cao", AutoSize = true };
+        var khungNangCao = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, RowCount = 2 };
+        khungNangCao.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        locNangCao.Visible = false;
+        nutNangCao.CheckedChanged += (_, _) => locNangCao.Visible = nutNangCao.Checked;
+        khungNangCao.Controls.AddRange([nutNangCao, locNangCao]);
+        vungTim.Controls.Add(khungNangCao, 0, 1);
+        khungChinh.Controls.Add(vungTim, 0, 1);
 
         var thanhMaster = new FlowLayoutPanel
         {
@@ -223,6 +236,7 @@ public sealed class QuanLyHoaDonForm : Form
 
     private void GanSuKien()
     {
+        locNangCao.YeuCauTimKiem += (_,_) => ThucHienTimKiem();
         nutTimKiem.Click += (_, _) => ThucHienTimKiem();
         oTimKiem.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; ThucHienTimKiem(); } };
         cboTrangThai.SelectedIndexChanged += (_, _) => ThucHienTimKiem();
@@ -282,9 +296,19 @@ public sealed class QuanLyHoaDonForm : Form
             _ => "TAT_CA"
         };
 
-        var ketQua = bus.TimKiemHoaDon(danhSachGoc, tuKhoa, trangThai);
-        HienThiDanhSachHoaDon(ketQua);
-        thongBao.Text = $"Tìm thấy {ketQua.Count} hóa đơn phù hợp.";
+        try
+        {
+            var ketQua = bus.TimKiemHoaDon(danhSachGoc, tuKhoa, trangThai);
+            if (locNangCao.Visible) ketQua = bus.LocDanhSach(ketQua, locNangCao.DocDieuKien());
+            HienThiDanhSachHoaDon(ketQua);
+            thongBao.ForeColor = GiaoDien.MauChuPhu;
+            thongBao.Text = $"Tìm thấy {ketQua.Count} hóa đơn phù hợp.";
+        }
+        catch (ArgumentException loi)
+        {
+            thongBao.ForeColor = Color.Firebrick;
+            thongBao.Text = loi.Message;
+        }
     }
 
     private void HienThiDanhSachHoaDon(IEnumerable nguon)

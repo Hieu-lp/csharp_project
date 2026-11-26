@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using FlightBooking.DAO;
@@ -9,6 +9,8 @@ namespace FlightBooking.BUS;
 public sealed class QuanLyBUS
 {
     private readonly QuanLyDAO dao;
+
+    public QuanLyBUS() : this(MyConnection.DocChuoiKetNoi() ?? "") { }
 
     public QuanLyBUS(string chuoiKetNoi)
     {
