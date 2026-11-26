@@ -49,6 +49,8 @@ public sealed class QuanLyHoaDonForm : Form
     // Các nút thao tác nghiệp vụ
     private readonly Button nutThanhToan = TaoNut("Xác nhận thanh toán (PAID)", chinh: true);
     private readonly Button nutHuyHoaDon = TaoNut("Hủy hóa đơn", canhBao: true);
+    private readonly Button nutXuatPDF = TaoNut("Xuất hóa đơn PDF");
+    private readonly Button nutXuatExcel = TaoNut("Xuất DS Excel");
 
     public QuanLyHoaDonForm()
     {
@@ -141,6 +143,7 @@ public sealed class QuanLyHoaDonForm : Form
         };
         vungNut.Controls.Add(nutHuyHoaDon);
         vungNut.Controls.Add(nutThanhToan);
+        vungNut.Controls.Add(nutXuatPDF);
         vungThaoTacDetail.Controls.Add(vungNut, 1, 0);
 
         khungChinh.Controls.Add(vungThaoTacDetail, 0, 4);
@@ -182,6 +185,7 @@ public sealed class QuanLyHoaDonForm : Form
 
         vung.Controls.Add(nutTimKiem);
         vung.Controls.Add(nutTaiLai);
+        vung.Controls.Add(nutXuatExcel);
         return vung;
     }
 
@@ -232,6 +236,12 @@ public sealed class QuanLyHoaDonForm : Form
 
         nutThanhToan.Click += (_, _) => ThucHienThanhToan();
         nutHuyHoaDon.Click += (_, _) => ThucHienHuyHoaDon();
+        nutXuatPDF.Click += (_, _) =>
+        {
+            if (hoaDonDangChon != null)
+                InHoaDonPDF.InHoaDon(this, hoaDonDangChon);
+        };
+        nutXuatExcel.Click += (_, _) => ThucHienXuatExcel();
     }
 
     private void TaiDanhSach()
@@ -327,6 +337,7 @@ public sealed class QuanLyHoaDonForm : Form
 
         nutThanhToan.Enabled = hd.TrangThai == "UNPAID";
         nutHuyHoaDon.Enabled = hd.TrangThai != "CANCELLED";
+        nutXuatPDF.Enabled = true;
 
         TaiChiTietHoaDon(hd.MaHoaDon);
     }
@@ -338,6 +349,7 @@ public sealed class QuanLyHoaDonForm : Form
         lblThongTinChon.ForeColor = GiaoDien.MauChuPhu;
         nutThanhToan.Enabled = false;
         nutHuyHoaDon.Enabled = false;
+        nutXuatPDF.Enabled = false;
 
         danhSachChiTiet.BeginUpdate();
         danhSachChiTiet.Items.Clear();
@@ -433,6 +445,27 @@ public sealed class QuanLyHoaDonForm : Form
         catch (Exception ex)
         {
             MessageBox.Show(this, $"Lỗi hủy: {ex.Message}", "Lỗi hệ thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void ThucHienXuatExcel()
+    {
+        using var sfd = new SaveFileDialog
+        {
+            Filter = "Tệp Excel CSV (*.csv)|*.csv",
+            FileName = $"DanhSachHoaDon_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+        };
+        if (sfd.ShowDialog(this) == DialogResult.OK)
+        {
+            try
+            {
+                XuatNhapDuLieuBUS.XuatExcelHoaDon(danhSachGoc, sfd.FileName);
+                MessageBox.Show(this, "Xuất dữ liệu Excel thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Lỗi xuất file: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 

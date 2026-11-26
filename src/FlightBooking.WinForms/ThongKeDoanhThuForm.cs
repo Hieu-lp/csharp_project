@@ -35,6 +35,17 @@ public sealed class ThongKeDoanhThuForm : Form
         Padding = new Padding(12, 2, 12, 2)
     };
 
+    private readonly Button nutXuatExcel = new()
+    {
+        Text = "Xuất báo cáo Excel",
+        AutoSize = true,
+        Height = 36,
+        FlatStyle = FlatStyle.Flat,
+        BackColor = Color.White,
+        ForeColor = GiaoDien.MauChu,
+        Padding = new Padding(12, 2, 12, 2)
+    };
+
     public ThongKeDoanhThuForm()
     {
         Text = "Thống kê doanh thu & Hiệu quả bán vé";
@@ -49,6 +60,7 @@ public sealed class ThongKeDoanhThuForm : Form
         TaoBoCuc();
 
         nutTaiLai.Click += (_, _) => TaiSoLieu();
+        nutXuatExcel.Click += (_, _) => ThucHienXuatExcel();
         Load += (_, _) => TaiSoLieu();
     }
 
@@ -78,8 +90,8 @@ public sealed class ThongKeDoanhThuForm : Form
             RowCount = 1,
             Margin = new Padding(0, 0, 0, 14)
         };
-        thanhTieuDe.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 80));
-        thanhTieuDe.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
+        thanhTieuDe.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65));
+        thanhTieuDe.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35));
 
         thanhTieuDe.Controls.Add(new Label
         {
@@ -90,7 +102,17 @@ public sealed class ThongKeDoanhThuForm : Form
             TextAlign = ContentAlignment.MiddleLeft
         }, 0, 0);
 
-        thanhTieuDe.Controls.Add(nutTaiLai, 1, 0);
+        var vungNutTieuDe = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false,
+            Margin = Padding.Empty
+        };
+        vungNutTieuDe.Controls.Add(nutXuatExcel);
+        vungNutTieuDe.Controls.Add(nutTaiLai);
+        thanhTieuDe.Controls.Add(vungNutTieuDe, 1, 0);
         khungChinh.Controls.Add(thanhTieuDe, 0, 0);
 
         // Vùng thẻ KPI
@@ -245,6 +267,28 @@ public sealed class ThongKeDoanhThuForm : Form
         catch (Exception ex)
         {
             MessageBox.Show(this, $"Lỗi tải dữ liệu thống kê: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void ThucHienXuatExcel()
+    {
+        using var sfd = new SaveFileDialog
+        {
+            Filter = "Tệp Excel CSV (*.csv)|*.csv",
+            FileName = $"BaoCaoDoanhThu_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+        };
+        if (sfd.ShowDialog(this) == DialogResult.OK)
+        {
+            try
+            {
+                var tk = bus.ThongKeTongHop();
+                XuatNhapDuLieuBUS.XuatExcelThongKe(tk, sfd.FileName);
+                MessageBox.Show(this, "Xuất báo cáo thống kê ra Excel thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Lỗi xuất file: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 

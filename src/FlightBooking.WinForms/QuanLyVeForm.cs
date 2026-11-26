@@ -42,6 +42,7 @@ public sealed class QuanLyVeForm : Form
 
     private readonly Button nutTimKiem = TaoNut("Tìm kiếm");
     private readonly Button nutTaiLai = TaoNut("Tải lại");
+    private readonly Button nutXuatExcel = TaoNut("Xuất Excel");
     private readonly Button nutHuyVe = TaoNut("Hủy vé", canhBao: true);
     private readonly Button nutLamTrong = TaoNut("Bỏ chọn");
 
@@ -139,6 +140,7 @@ public sealed class QuanLyVeForm : Form
 
         vung.Controls.Add(nutTimKiem);
         vung.Controls.Add(nutTaiLai);
+        vung.Controls.Add(nutXuatExcel);
         return vung;
     }
 
@@ -227,6 +229,7 @@ public sealed class QuanLyVeForm : Form
         };
 
         nutHuyVe.Click += (_, _) => ThucHienHuyVe();
+        nutXuatExcel.Click += (_, _) => ThucHienXuatExcel();
     }
 
     private void TaiDanhSach()
@@ -364,6 +367,27 @@ public sealed class QuanLyVeForm : Form
         catch (Exception ex)
         {
             MessageBox.Show(this, $"Lỗi xử lý: {ex.Message}", "Lỗi hệ thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void ThucHienXuatExcel()
+    {
+        using var sfd = new SaveFileDialog
+        {
+            Filter = "Tệp Excel CSV (*.csv)|*.csv",
+            FileName = $"DanhSachVe_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+        };
+        if (sfd.ShowDialog(this) == DialogResult.OK)
+        {
+            try
+            {
+                XuatNhapDuLieuBUS.XuatExcelVe(danhSachGoc, sfd.FileName);
+                MessageBox.Show(this, "Xuất danh sách vé ra Excel thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Lỗi xuất file: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 
