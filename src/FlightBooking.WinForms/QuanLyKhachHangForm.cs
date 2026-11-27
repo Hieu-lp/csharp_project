@@ -49,6 +49,8 @@ public sealed class QuanLyKhachHangForm : Form
     private readonly Button nutSua = TaoNut("Cập nhật");
     private readonly Button nutXoa = TaoNut("Xóa");
     private readonly Button nutLamTrong = TaoNut("Làm trống form");
+    private readonly Button nutNhapExcel = TaoNut("Nhập .xls");
+    private readonly Button nutMauExcel = TaoNut("Mẫu .xls");
 
     public QuanLyKhachHangForm()
     {
@@ -188,6 +190,8 @@ public sealed class QuanLyKhachHangForm : Form
         vung.Controls.Add(nutSua);
         vung.Controls.Add(nutXoa);
         vung.Controls.Add(nutLamTrong);
+        vung.Controls.Add(nutNhapExcel);
+        vung.Controls.Add(nutMauExcel);
         return vung;
     }
 
@@ -216,6 +220,8 @@ public sealed class QuanLyKhachHangForm : Form
         nutSua.Click += SuaKhachHang_Click;
         nutXoa.Click += XoaKhachHang_Click;
         nutLamTrong.Click += (_, _) => XoaDuLieuNhap();
+        nutNhapExcel.Click += NhapExcel_Click;
+        nutMauExcel.Click += MauExcel_Click;
         danhSach.SelectedIndexChanged += (_, _) => DienDuLieuDaChon();
         oTimKiem.KeyDown += (_, suKien) =>
         {
@@ -275,6 +281,30 @@ public sealed class QuanLyKhachHangForm : Form
         {
             HienThiLoiDuLieu(loiGoc);
         }
+    }
+
+    private void NhapExcel_Click(object? nguoiGui, EventArgs suKien)
+    {
+        if (!CoTheRoiTrang()) return;
+        using var hopThoai = new OpenFileDialog { Filter = "Excel 97–2003 (*.xls)|*.xls", CheckFileExists = true };
+        if (hopThoai.ShowDialog(this) != DialogResult.OK) return;
+        try
+        {
+            List<KhachHangDTO> cacKhach = XuatNhapDuLieuBUS.DocKhachHangTuExcel(hopThoai.FileName);
+            if (MessageBox.Show(this, $"Đã đọc và kiểm tra {cacKhach.Count} khách hàng. Nhập tất cả trong một giao dịch?\nChỉ thêm mới; không ghi đè khách hàng hay chứng từ hiện có.", "Xác nhận nhập", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+            int soDong = bus.NhapKhachHang(cacKhach);
+            duLieuBanDau = ChupDuLieu(); TaiDanhSach();
+            thongBao.Text = $"Đã nhập {soDong} khách hàng.";
+        }
+        catch (Exception loi) { HienThiLoiDuLieu(loi); }
+    }
+
+    private void MauExcel_Click(object? nguoiGui, EventArgs suKien)
+    {
+        using var hopThoai = new SaveFileDialog { Filter = "Excel 97–2003 (*.xls)|*.xls", FileName = "MauKhachHang.xls" };
+        if (hopThoai.ShowDialog(this) != DialogResult.OK) return;
+        try { XuatNhapDuLieuBUS.TaoMauKhachHang(hopThoai.FileName); thongBao.Text = "Đã tạo mẫu 6 cột. Ngày sinh dd/MM/yyyy; điện thoại/giấy tờ giữ dạng text."; }
+        catch (Exception loi) { HienThiLoiDuLieu(loi); }
     }
 
     private void SuaKhachHang_Click(object? nguoiGui, EventArgs suKien)

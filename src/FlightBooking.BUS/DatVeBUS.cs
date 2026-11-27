@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
 using System.Text;
@@ -14,6 +14,8 @@ public sealed class DatVeBUS
 {
     private readonly DatVeDAO dao;
     private readonly TimeProvider dongHo;
+
+    public DatVeBUS() : this(MyConnection.DocChuoiKetNoi() ?? "") { }
 
     public DatVeBUS(string chuoiKetNoi, TimeProvider? dongHo = null)
     {
@@ -247,7 +249,7 @@ public sealed class DatVeBUS
     public static void ChuanHoaHanhTrinh(YeuCauDatVe yeuCau)
     {
         if (yeuCau.Quantity is < 1 or > 9) throw new LoiDatVe("Chọn từ 1 đến 9 hành khách.");
-        if (yeuCau.TripType == "OneWay") { yeuCau.ReturnDate = null; yeuCau.ReturnFlightId = null; yeuCau.ReturnFareId = null; }
+        if (yeuCau.TripType == "OneWay") { yeuCau.ReturnDate = null; yeuCau.ReturnFlightId = null; yeuCau.ReturnFareId = null; yeuCau.ReturnSeats = null; }
         else if (yeuCau.TripType != "RoundTrip" || yeuCau.ReturnDate is null || yeuCau.ReturnFlightId is not > 0 || yeuCau.ReturnFareId is not > 0)
             throw new LoiDatVe("Chọn đầy đủ chuyến đi, chuyến về và ngày về.");
     }
@@ -260,11 +262,64 @@ public sealed class DatVeBUS
     }
 
     public int TaoDatVe(YeuCauDatVe yeuCau, string khoaTraCuu)
+        => TaoDatVeChung(yeuCau, khoaTraCuu, null, null);
+
+    public int TaoDatVeTaiQuay(YeuCauDatVe yeuCau, int maKhachHang, int maNhanVien, string khoaChongLap)
+    {
+        if (maKhachHang <= 0 || maNhanVien <= 0) throw new LoiDatVe("Chọn khách hàng và nhân viên tại quầy.");
+        if(yeuCau.Seats?.Count!=yeuCau.Quantity || (yeuCau.TripType=="RoundTrip" && yeuCau.ReturnSeats?.Count!=yeuCau.Quantity))
+            throw new LoiDatVe("Xem/chọn đủ ghế từng hành khách trước khi xác nhận tại quầy.");
+        yeuCau.Customer = dao.DocDuLieu(duLieu => duLieu.DocKhachTaiQuay(maKhachHang));
+        return TaoDatVeChung(yeuCau, khoaChongLap, maKhachHang, maNhanVien);
+    }
+
+    private int TaoDatVeChung(YeuCauDatVe yeuCau, string khoaTraCuu, int? khachTaiQuay, int? nhanVienTaiQuay)
     {
         // 1. Kiểm tra/chuẩn hóa DTO và giữ nguyên cấu trúc nội dung dùng để chống gửi lặp.
         KiemTraYeuCauDatVe(yeuCau, DateOnly.FromDateTime(ThoiDiemHienTai));
         var maBam = BamKhoa(khoaTraCuu);
-        var maBamNoiDung = BamChuoi(JsonSerializer.Serialize(new
+        var maBamNoiDung = BamChuoi((khachTaiQuay.HasValue ? $"counter:{khachTaiQuay}:{nhanVienTaiQuay}:" : "") + NoiDungChongGuiLap(yeuCau));
+        return dao.TrongGiaoDich(duLieu =>
+        {
+            duLieu.KhoaYeuCau(maBam);
+            if (duLieu.TimYeuCau(maBam) is { } truocDo)
+            {
+                if (truocDo.PayloadHash != maBamNoiDung) throw new LoiDatVe("Biểu mẫu đã được đặt với nội dung khác. Hãy bắt đầu đơn mới.");
+                return truocDo.BookingId;
+            }
+            if (khachTaiQuay.HasValue)
+            {
+                if (!duLieu.NhanVienConHoatDong(nhanVienTaiQuay!.Value))
+                    throw new LoiDatVe("Nhân viên không còn hoạt động.");
+                var khachMoi = duLieu.DocKhachTaiQuay(khachTaiQuay.Value, true);
+                var khachCu = yeuCau.Customer;
+                yeuCau.Customer = khachMoi;
+                KiemTraYeuCauDatVe(yeuCau, HomNay);
+                if (JsonSerializer.Serialize(khachCu) != JsonSerializer.Serialize(yeuCau.Customer))
+                    throw new LoiDatVe("Thông tin khách hàng vừa thay đổi. Tải lại trước khi đặt.");
+            }
+            // 2. Cả hai lượt dùng chung transaction; khóa chuyến theo ID tăng dần.
+            KhoaChuyenTheoThuTu(duLieu, new[] { yeuCau.FlightId, yeuCau.ReturnFlightId ?? yeuCau.FlightId });
+            var hienTai = ThoiDiemHienTai;
+            var hanhTrinh = LapBaoGiaHanhTrinh(duLieu, yeuCau, hienTai, true);
+            if (yeuCau.ExpectedTotal != hanhTrinh.TongTien)
+                throw new LoiDatVe("Giá hoặc giảm giá vừa thay đổi. Hãy tính lại giá trước khi xác nhận.");
+            // 3. Chỉ ghi sau khi giá được tính lại và đối chiếu với giá đã xác nhận.
+            int maKhachHang = khachTaiQuay ?? duLieu.ThemKhachDat(yeuCau.Customer);
+            int ma = TaoDatVeMotChang(duLieu, yeuCau, maKhachHang, maBamNoiDung, hienTai, hanhTrinh.LuotDi, maBam, nhanVienTaiQuay);
+            if (hanhTrinh.LuotVe is not null)
+            {
+                TaoDatVeMotChang(duLieu, yeuCau, maKhachHang, maBamNoiDung, hienTai, hanhTrinh.LuotVe, BamKhoa(KhoaLuotVe(khoaTraCuu)), nhanVienTaiQuay);
+            }
+            return ma;
+        });
+    }
+
+    // M?t h?p ??ng serialize d?ng chung cho ??t v? v? chu?n b? fixture h?p l?.
+    // Ng??i g?i chu?n h?a DTO b?ng KiemTraYeuCauDatVe tr??c khi l?y n?i dung.
+    public static string NoiDungChongGuiLap(YeuCauDatVe yeuCau)
+    {
+        var noiDung = JsonSerializer.Serialize(new
         {
             FlightId = yeuCau.FlightId,
             FareId = yeuCau.FareId,
@@ -276,43 +331,25 @@ public sealed class DatVeBUS
             Customer = yeuCau.Customer,
             Passengers = yeuCau.Passengers,
             DiscountCode = yeuCau.DiscountCode
-        }));
-        return dao.TrongGiaoDich(duLieu =>
-        {
-            duLieu.KhoaYeuCau(maBam);
-            if (duLieu.TimYeuCau(maBam) is { } truocDo)
-            {
-                if (truocDo.PayloadHash != maBamNoiDung) throw new LoiDatVe("Biểu mẫu đã được đặt với nội dung khác. Hãy bắt đầu đơn mới.");
-                return truocDo.BookingId;
-            }
-            // 2. Cả hai lượt dùng chung transaction; khóa chuyến theo ID tăng dần.
-            KhoaChuyenTheoThuTu(duLieu, new[] { yeuCau.FlightId, yeuCau.ReturnFlightId ?? yeuCau.FlightId });
-            var hienTai = ThoiDiemHienTai;
-            var hanhTrinh = LapBaoGiaHanhTrinh(duLieu, yeuCau, hienTai, true);
-            if (yeuCau.ExpectedTotal != hanhTrinh.TongTien)
-                throw new LoiDatVe("Giá hoặc giảm giá vừa thay đổi. Hãy tính lại giá trước khi xác nhận.");
-            // 3. Chỉ ghi sau khi giá được tính lại và đối chiếu với giá đã xác nhận.
-            int maKhachHang = duLieu.ThemKhachDat(yeuCau.Customer);
-            int ma = TaoDatVeMotChang(duLieu, yeuCau, maKhachHang, maBamNoiDung, hienTai, hanhTrinh.LuotDi, maBam);
-            if (hanhTrinh.LuotVe is not null)
-            {
-                TaoDatVeMotChang(duLieu, yeuCau, maKhachHang, maBamNoiDung, hienTai, hanhTrinh.LuotVe, BamKhoa(KhoaLuotVe(khoaTraCuu)));
-            }
-            return ma;
         });
+        if (yeuCau.Seats == null && yeuCau.ReturnSeats == null) return noiDung;
+        return noiDung[..^1] + ",\"Seats\":" + JsonSerializer.Serialize(yeuCau.Seats) + ",\"ReturnSeats\":" + JsonSerializer.Serialize(yeuCau.ReturnSeats) + "}";
     }
 
     private static int TaoDatVeMotChang(DuLieuDatVe duLieu, YeuCauDatVe yeuCau, int maKhachHang,
-        string maBamNoiDung, DateTime hienTai, BaoGiaDatVeDTO baoGia, string maBamYeuCau)
+        string maBamNoiDung, DateTime hienTai, BaoGiaDatVeDTO baoGia, string maBamYeuCau, int? maNhanVien = null)
     {
         // Hàm nhận context đang có transaction, tuyệt đối không tự mở kết nối/commit lượt riêng.
         HashSet<string> gheHieuLuc = duLieu.DocGheHieuLuc(baoGia.ChuyenBay.MaChuyenBay);
+        KiemTraSoDoGhe(baoGia.ChuyenBay.TongSoGhe,gheHieuLuc);
         if (gheHieuLuc.Count != baoGia.ChuyenBay.TongSoGhe - baoGia.ChuyenBay.SoGheCon)
             throw new LoiDatVe("Số liệu ghế không khớp số vé hiệu lực. Liên hệ nhóm quản lý.");
-        IReadOnlyList<string> danhSachGhe = CapGhe(baoGia.ChuyenBay.TongSoGhe, gheHieuLuc, yeuCau.Quantity);
+        var gheDaChon = baoGia.ChuyenBay.MaChuyenBay == yeuCau.FlightId ? yeuCau.Seats : yeuCau.ReturnSeats;
+        IReadOnlyList<string> danhSachGhe = gheDaChon == null ? CapGhe(baoGia.ChuyenBay.TongSoGhe, gheHieuLuc, yeuCau.Quantity)
+            : KiemTraGheDaChon(baoGia.ChuyenBay.TongSoGhe, gheHieuLuc, yeuCau.Quantity, gheDaChon);
         duLieu.GiuGhe(baoGia.ChuyenBay.MaChuyenBay, yeuCau.Quantity);
         if (baoGia.MaGiamGia is int maGiamGia) duLieu.DungMaGiamGia(maGiamGia);
-        int maDatVe = duLieu.ThemDatVe(maKhachHang, baoGia, hienTai);
+        int maDatVe = duLieu.ThemDatVe(maKhachHang, baoGia, hienTai, maNhanVien);
         int maHoaDon = duLieu.ThemHoaDon(maDatVe, baoGia, hienTai);
         for (int i = 0; i < yeuCau.Quantity; i++)
         {
@@ -383,6 +420,124 @@ public sealed class DatVeBUS
             {
                 if (datVe.TrangThai != "CANCELLED") duLieu.HuyDatVe(datVe);
             }
+        });
+    }
+
+    public IReadOnlyList<string> DocGheTrong(int maChuyenBay, int soNguoi)
+    {
+        return dao.DocDuLieu(d =>
+        {
+            var c = d.DocChuyenBay(maChuyenBay);
+            if (soNguoi < 1 || soNguoi > 9 || c.TrangThai != "SCHEDULED" || c.ThoiDiemKhoiHanh <= ThoiDiemHienTai || c.SoGheCon < soNguoi)
+                throw new LoiDatVe("Chuyến không còn đủ điều kiện/ghế để đặt.");
+            var daBan = d.DocGheHieuLuc(maChuyenBay);
+            KiemTraSoDoGhe(c.TongSoGhe,daBan);
+            if (daBan.Count != c.TongSoGhe-c.SoGheCon) throw new LoiDatVe("Số liệu ghế không nhất quán.");
+            return CapGhe(c.TongSoGhe, daBan, c.SoGheCon);
+        });
+    }
+
+    public static void KiemTraSoDoGhe(int tongGhe, HashSet<string> daBan)
+    {
+        var hopLe=new HashSet<string>(CapGhe(tongGhe,new(),tongGhe),StringComparer.OrdinalIgnoreCase);
+        foreach(string g in daBan)if(!hopLe.Contains(g))throw new LoiDatVe("Dữ liệu ghế cũ vượt sơ đồ A–F/sức chứa. Cần người phụ trách kiểm tra trước khi đặt thêm; chưa đổi dữ liệu.");
+    }
+
+    public static IReadOnlyList<string> KiemTraGheDaChon(int tongGhe, HashSet<string> daBan, int soNguoi, IReadOnlyList<string> ghe)
+    {
+        if (soNguoi < 1 || soNguoi > 9 || ghe.Count != soNguoi) throw new LoiDatVe("Số ghế đã chọn không khớp hành khách.");
+        var hopLe = new HashSet<string>(CapGhe(tongGhe, new HashSet<string>(), tongGhe));
+        var trung = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string g in ghe)
+            if (!hopLe.Contains(g) || !trung.Add(g) || daBan.Contains(g))
+                throw new LoiDatVe("Ghế không hợp lệ, bị trùng hoặc vừa được đặt. Hãy xem/chọn lại ghế; hệ thống không tự đổi ghế.");
+        return ghe;
+    }
+
+    public void DoiGheVe(int maVe, string gheCu, string gheMoi)
+    {
+        gheMoi=(gheMoi??"").Trim().ToUpperInvariant();
+        var lk=dao.DocDuLieu(d=>d.DocLienKetSuaVe(maVe));
+        if(lk.Count is <1 or >2) throw new LoiDatVe("Không xác định duy nhất đơn chứa vé.");
+        dao.TrongGiaoDich(d=>
+        {
+            foreach(var k in lk.OrderBy(x=>x.Hash,StringComparer.Ordinal)) if(k.Hash!=null)d.KhoaYeuCau(k.Hash);
+            KhoaChuyenTheoThuTu(d,lk.Select(x=>x.Flight));
+            if(!lk.SequenceEqual(d.DocLienKetSuaVe(maVe)))throw new LoiDatVe("Liên kết vé vừa thay đổi.");
+            DatVeDTO? don=null;
+            foreach(var k in lk)
+            {
+                var b=d.DocDatVeQuanTri(k.Booking,true);
+                if(b!=null && b.ChiTiet.Any(x=>x.MaVe==maVe))don=b;
+            }
+            if(don==null)throw new LoiDatVe("Không tìm thấy vé.");
+            KiemTraDieuKienSua(don,ThoiDiemHienTai);
+            var ve=don.ChiTiet.Single(x=>x.MaVe==maVe);
+            if(ve.SoGhe!=gheCu)throw new LoiDatVe("Ghế đã đổi bởi phiên khác. Tải lại vé.");
+            var ban=d.DocGheHieuLuc(don.MaChuyenBay);ban.Remove(gheCu);
+            KiemTraGheDaChon(don.ChuyenBay.TongSoGhe,ban,1,new[]{gheMoi});
+            d.DoiGheVe(maVe,gheCu,gheMoi);
+        });
+    }
+
+    public static ThongTinHanhKhach KiemTraThongTinSua(ThongTinHanhKhach thongTin)
+    {
+        var ketQua = new ThongTinHanhKhach { FullName = (thongTin.FullName ?? "").Trim(), IdCard = (thongTin.IdCard ?? "").Trim().ToUpperInvariant() };
+        var loi = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(ketQua, new ValidationContext(ketQua), loi, true))
+            throw new LoiDatVe(loi[0].ErrorMessage ?? "Thông tin hành khách không hợp lệ.");
+        return ketQua;
+    }
+
+    public static void KiemTraDieuKienSua(DatVeDTO don, DateTime hienTai)
+    {
+        if (don.TrangThai != "CONFIRMED" || don.TrangThaiHoaDon != "UNPAID" ||
+            don.ChuyenBay.TrangThai != "SCHEDULED" || don.ChuyenBay.ThoiDiemKhoiHanh <= hienTai ||
+            don.ChiTiet.Count != don.SoLuongVe || don.ChiTiet.Count < 1 || don.ChiTiet.Any(v => v.TrangThaiVe != "ISSUED"))
+            throw new LoiDatVe("Chỉ sửa hành khách của đơn UNPAID, vé ISSUED và chuyến mở bán chưa khởi hành.");
+    }
+
+    public void SuaThongTinHanhKhach(int maVe, ThongTinHanhKhach thongTin)
+    {
+        if (maVe <= 0) throw new LoiDatVe("Chọn vé cần sửa.");
+        var moi = KiemTraThongTinSua(thongTin);
+        var lienKet = dao.DocDuLieu(d => d.DocLienKetSuaVe(maVe));
+        if (lienKet.Count is < 1 or > 2) throw new LoiDatVe("Không xác định duy nhất đơn/hành trình chứa vé. Cần kiểm tra liên kết trước khi sửa.");
+        dao.TrongGiaoDich(d =>
+        {
+            var khoa = lienKet.Where(x => x.Hash is not null).Select(x => x.Hash!).OrderBy(x => x, StringComparer.Ordinal).ToArray();
+            foreach (var k in khoa) d.KhoaYeuCau(k);
+            KhoaChuyenTheoThuTu(d, lienKet.Select(x => x.Flight));
+            if (!lienKet.SequenceEqual(d.DocLienKetSuaVe(maVe))) throw new LoiDatVe("Liên kết hành trình vừa thay đổi. Tải lại trước khi sửa.");
+            var cacDon = new List<DatVeDTO>();
+            foreach (var lk in lienKet)
+            {
+                var don = d.DocDatVeQuanTri(lk.Booking, true) ?? throw new LoiDatVe("Không tìm thấy đơn.");
+                KiemTraDieuKienSua(don, ThoiDiemHienTai); cacDon.Add(don);
+            }
+            if (cacDon.Count == 2)
+            {
+                var a = cacDon[0]; var b = cacDon[1];
+                if (a.MaKhachHang != b.MaKhachHang || a.SoLuongVe != b.SoLuongVe || a.NguonDat != b.NguonDat ||
+                    a.ChuyenBay.MaSanBayDi != b.ChuyenBay.MaSanBayDen || a.ChuyenBay.MaSanBayDen != b.ChuyenBay.MaSanBayDi ||
+                    a.MaChuyenBay == b.MaChuyenBay ||
+                    !(a.ChuyenBay.ThoiDiemKhoiHanh > b.ChuyenBay.ThoiDiemDen || b.ChuyenBay.ThoiDiemKhoiHanh > a.ChuyenBay.ThoiDiemDen))
+                    throw new LoiDatVe("Liên kết không phải một hành trình khứ hồi duy nhất. Chưa sửa dữ liệu.");
+            }
+            var cu = cacDon.SelectMany(x => x.ChiTiet).SingleOrDefault(x => x.MaVe == maVe)
+                ?? throw new LoiDatVe("Vé không thuộc hành trình đã khóa.");
+            var canSua = new List<(int Booking, int Ticket)>();
+            foreach (var don in cacDon)
+            {
+                var khop = don.ChiTiet.Where(x => string.Equals(x.GiayToHanhKhach.Trim(), cu.GiayToHanhKhach.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray();
+                if (khop.Length != 1 || khop[0].HoTenHanhKhach != cu.HoTenHanhKhach)
+                    throw new LoiDatVe("Không xác định được cùng hành khách ở hai lượt.");
+                if (don.ChiTiet.Any(x => x.MaVe != khop[0].MaVe && string.Equals(x.GiayToHanhKhach.Trim(), moi.IdCard, StringComparison.OrdinalIgnoreCase)))
+                    throw new LoiDatVe("Giấy tờ trùng hành khách khác trong đơn.");
+                canSua.Add((don.MaDatVe, khop[0].MaVe));
+            }
+            foreach (var ve in canSua) d.SuaHanhKhach(ve.Booking, ve.Ticket, moi);
+            // Giữ hash yêu cầu gốc để retry vẫn trỏ đúng đơn; chỉ đổi BOOKING_DETAIL.
         });
     }
 

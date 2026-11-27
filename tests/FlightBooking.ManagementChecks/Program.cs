@@ -85,4 +85,5 @@ EmployeeChecks.Run();
 DiscountCodeChecks.Run();
 ArrayListSearchChecks.Run();
 TicketInvoiceChecks.Run();
-Console.WriteLine($"{checks} checks passed.");
+FinalIntegrationChecks.Run();
+Console.WriteLine($"{checks + CheckAssert.PassedCount} checks passed (offline assertions, SQL only if --sql was explicitly supplied).");

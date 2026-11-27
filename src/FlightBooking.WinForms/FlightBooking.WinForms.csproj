@@ -1,6 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <None Include="..\..\connection.local.txt" Link="connection.local.txt"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never"
+          Condition="Exists('..\..\connection.local.txt')" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\FlightBooking.BUS\FlightBooking.BUS.csproj" />
     <ProjectReference Include="..\FlightBooking.DTO\FlightBooking.DTO.csproj" />
   </ItemGroup>

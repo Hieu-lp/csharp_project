@@ -95,6 +95,24 @@ internal static class GiaoDien
         ForeColor = MauChu,
         Margin = Padding.Empty
     };
+    public static void CanCotDanhSach(ListView danhSach)
+    {
+        danhSach.ShowItemToolTips = true;
+        for (int cot = 0; cot < danhSach.Columns.Count; cot++)
+        {
+            int rong = TextRenderer.MeasureText(danhSach.Columns[cot].Text, danhSach.Font).Width + 24;
+            foreach (ListViewItem dong in danhSach.Items)
+                if (dong.SubItems.Count > cot)
+                    rong = Math.Max(rong, TextRenderer.MeasureText(dong.SubItems[cot].Text, danhSach.Font).Width + 24);
+            danhSach.Columns[cot].Width = Math.Clamp(rong, 80, 420);
+        }
+        foreach (ListViewItem dong in danhSach.Items)
+        {
+            var cacO = new List<string>();
+            foreach (ListViewItem.ListViewSubItem o in dong.SubItems) cacO.Add(o.Text);
+            dong.ToolTipText = string.Join(" · ", cacO);
+        }
+    }
     public static NumericUpDown TaoONhapSo(decimal toiDa, int soLe = 0) => new()
     { Minimum = 0, Maximum = toiDa, DecimalPlaces = soLe, ThousandsSeparator = true, Dock = DockStyle.Fill };
     public static DateTimePicker TaoONhapNgay() => new()

@@ -32,6 +32,10 @@ public class VeMayBayDTO
     [JsonPropertyName("Price")]
     public decimal GiaVe { get; set; }
 
+    // Phân biệt vé miễn phí (giá 0 có chứng từ) với vé thiếu giá lịch sử.
+    [JsonPropertyName("HasHistoricalPrice")]
+    public bool CoGiaLichSu { get; set; } = true;
+
     [JsonPropertyName("DepartureAirport")]
     public string SanBayDi { get; set; } = string.Empty;
 
@@ -52,4 +56,6 @@ public class VeMayBayDTO
 
     [JsonPropertyName("BookingId")]
     public int? MaDatVe { get; set; }
+    [JsonPropertyName("InvoiceStatus")]
+    public string TrangThaiHoaDon { get; set; } = "";
 }

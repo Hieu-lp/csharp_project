@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using FlightBooking.BUS;
 using FlightBooking.DTO;
 
@@ -13,6 +13,7 @@ public sealed class QuanLyHoaDonForm : Form
 {
     private readonly HoaDonBUS bus = new();
     private ArrayList danhSachGoc = new();
+    private readonly BoLocNangCao locNangCao = new(["Mã hóa đơn|MaHoaDon", "Mã đặt vé|MaDatVe", "Ngày lập|NgayHoaDon", "Khách hàng|TenKhachHang", "Chuyến bay|MaChuyenBay", "Tổng tiền|TongTien", "Tiền giảm|TienGiam", "Số vé|SoLuongVe", "Trạng thái|TrangThai"]);
     private HoaDonDTO? hoaDonDangChon;
 
     // Vùng tìm kiếm
@@ -71,6 +72,7 @@ public sealed class QuanLyHoaDonForm : Form
 
         FormClosing += (_, suKien) => suKien.Cancel = !CoTheRoiTrang();
         Load += (_, _) => TaiDanhSach();
+        SizeChanged += (_, _) => lblThongTinChon.MaximumSize = new Size(Math.Max(200, ClientSize.Width - 40), 0);
     }
 
     private void TaoBoCuc()
@@ -80,7 +82,7 @@ public sealed class QuanLyHoaDonForm : Form
             Dock = DockStyle.Fill,
             Padding = new Padding(18),
             ColumnCount = 1,
-            RowCount = 8
+            RowCount = 7
         };
         khungChinh.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
@@ -101,7 +103,19 @@ public sealed class QuanLyHoaDonForm : Form
             Margin = new Padding(3, 0, 3, 12)
         };
         khungChinh.Controls.Add(tieuDe, 0, 0);
-        khungChinh.Controls.Add(TaoVungTimKiem(), 0, 1);
+        var vungTim = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, RowCount = 2 };
+        vungTim.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        vungTim.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        vungTim.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        vungTim.Controls.Add(TaoVungTimKiem(), 0, 0);
+        var nutNangCao = new CheckBox { Text = "Tìm kiếm nâng cao", AutoSize = true };
+        var khungNangCao = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, RowCount = 2 };
+        khungNangCao.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        locNangCao.Visible = false;
+        nutNangCao.CheckedChanged += (_, _) => locNangCao.Visible = nutNangCao.Checked;
+        khungNangCao.Controls.AddRange([nutNangCao, locNangCao]);
+        vungTim.Controls.Add(khungNangCao, 0, 1);
+        khungChinh.Controls.Add(vungTim, 0, 1);
 
         var thanhMaster = new FlowLayoutPanel
         {
@@ -124,12 +138,11 @@ public sealed class QuanLyHoaDonForm : Form
         {
             Dock = DockStyle.Fill,
             AutoSize = true,
-            ColumnCount = 2,
-            RowCount = 1,
+            ColumnCount = 1,
+            RowCount = 2,
             Margin = new Padding(0, 8, 0, 4)
         };
-        vungThaoTacDetail.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60));
-        vungThaoTacDetail.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));
+        vungThaoTacDetail.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         vungThaoTacDetail.Controls.Add(lblThongTinChon, 0, 0);
 
@@ -137,14 +150,14 @@ public sealed class QuanLyHoaDonForm : Form
         {
             Dock = DockStyle.Fill,
             AutoSize = true,
-            FlowDirection = FlowDirection.RightToLeft,
-            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = true,
             Margin = Padding.Empty
         };
         vungNut.Controls.Add(nutHuyHoaDon);
         vungNut.Controls.Add(nutThanhToan);
         vungNut.Controls.Add(nutXuatPDF);
-        vungThaoTacDetail.Controls.Add(vungNut, 1, 0);
+        vungThaoTacDetail.Controls.Add(vungNut, 0, 1);
 
         khungChinh.Controls.Add(vungThaoTacDetail, 0, 4);
         khungChinh.Controls.Add(danhSachChiTiet, 0, 5);
@@ -196,8 +209,10 @@ public sealed class QuanLyHoaDonForm : Form
         ThemCot(danhSachHoaDon, "MaDatVe", "Mã Đặt Vé", 10);
         ThemCot(danhSachHoaDon, "KhachHang", "Khách hàng", 17);
         ThemCot(danhSachHoaDon, "DienThoai", "Điện thoại", 12);
+        ThemCot(danhSachHoaDon, "NhanVien", "Nhân viên / WEB", 15);
         ThemCot(danhSachHoaDon, "TamTinh", "Tạm tính (VNĐ)", 12);
         ThemCot(danhSachHoaDon, "TienGiam", "Giảm giá", 10);
+        ThemCot(danhSachHoaDon, "Thue", "Thuế", 10);
         ThemCot(danhSachHoaDon, "TongTien", "Tổng cộng (VNĐ)", 13);
         ThemCot(danhSachHoaDon, "TrangThai", "Trạng thái", 12);
         ThemCot(danhSachHoaDon, "NgayHoaDon", "Ngày lập HĐ", 14);
@@ -221,6 +236,7 @@ public sealed class QuanLyHoaDonForm : Form
 
     private void GanSuKien()
     {
+        locNangCao.YeuCauTimKiem += (_,_) => ThucHienTimKiem();
         nutTimKiem.Click += (_, _) => ThucHienTimKiem();
         oTimKiem.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; ThucHienTimKiem(); } };
         cboTrangThai.SelectedIndexChanged += (_, _) => ThucHienTimKiem();
@@ -239,7 +255,15 @@ public sealed class QuanLyHoaDonForm : Form
         nutXuatPDF.Click += (_, _) =>
         {
             if (hoaDonDangChon != null)
-                InHoaDonPDF.InHoaDon(this, hoaDonDangChon);
+            {
+                try
+                {
+                    var dayDu = bus.DocHoaDonTheoMa(hoaDonDangChon.MaHoaDon);
+                    if (dayDu is null) throw new InvalidOperationException("Hóa đơn không còn tồn tại.");
+                    InHoaDonPDF.InHoaDon(this, dayDu);
+                }
+                catch (Exception loi) { MessageBox.Show(this, loi.Message, "Không xuất được PDF", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            }
         };
         nutXuatExcel.Click += (_, _) => ThucHienXuatExcel();
     }
@@ -272,9 +296,19 @@ public sealed class QuanLyHoaDonForm : Form
             _ => "TAT_CA"
         };
 
-        var ketQua = bus.TimKiemHoaDon(danhSachGoc, tuKhoa, trangThai);
-        HienThiDanhSachHoaDon(ketQua);
-        thongBao.Text = $"Tìm thấy {ketQua.Count} hóa đơn phù hợp.";
+        try
+        {
+            var ketQua = bus.TimKiemHoaDon(danhSachGoc, tuKhoa, trangThai);
+            if (locNangCao.Visible) ketQua = bus.LocDanhSach(ketQua, locNangCao.DocDieuKien());
+            HienThiDanhSachHoaDon(ketQua);
+            thongBao.ForeColor = GiaoDien.MauChuPhu;
+            thongBao.Text = $"Tìm thấy {ketQua.Count} hóa đơn phù hợp.";
+        }
+        catch (ArgumentException loi)
+        {
+            thongBao.ForeColor = Color.Firebrick;
+            thongBao.Text = loi.Message;
+        }
     }
 
     private void HienThiDanhSachHoaDon(IEnumerable nguon)
@@ -291,9 +325,11 @@ public sealed class QuanLyHoaDonForm : Form
                 dong.SubItems.Add(hd.MaDatVe.ToString());
                 dong.SubItems.Add(hd.TenKhachHang);
                 dong.SubItems.Add(hd.DienThoaiKhachHang);
-                dong.SubItems.Add(hd.TongTienGoc.ToString("N0"));
-                dong.SubItems.Add(hd.TienGiam.ToString("N0"));
-                dong.SubItems.Add(hd.TongTien.ToString("N0"));
+                dong.SubItems.Add(hd.TenNhanVien);
+                dong.SubItems.Add(hd.TongTienGoc.ToString("N2"));
+                dong.SubItems.Add(hd.TienGiam.ToString("N2"));
+                dong.SubItems.Add(hd.TienThue.ToString("N2"));
+                dong.SubItems.Add(hd.TongTien.ToString("N2"));
 
                 string tt = hd.TrangThai switch
                 {
@@ -318,6 +354,7 @@ public sealed class QuanLyHoaDonForm : Form
         {
             danhSachHoaDon.EndUpdate();
         }
+        GiaoDien.CanCotDanhSach(danhSachHoaDon);
         BoChonHoaDon();
     }
 
@@ -332,14 +369,15 @@ public sealed class QuanLyHoaDonForm : Form
             _ => hd.TrangThai
         };
 
-        lblThongTinChon.Text = $"Hóa đơn #{hd.MaHoaDon} · Khách: {hd.TenKhachHang} ({hd.DienThoaiKhachHang}) · Tổng tiền: {hd.TongTien:N0} VNĐ · [{tt}]";
+        lblThongTinChon.Text = $"Hóa đơn #{hd.MaHoaDon} · Khách: {hd.TenKhachHang} ({hd.DienThoaiKhachHang}) · Tổng tiền: {hd.TongTien:N2} VNĐ · [{tt}]";
         lblThongTinChon.ForeColor = hd.TrangThai == "PAID" ? Color.DarkGreen : hd.TrangThai == "UNPAID" ? GiaoDien.MauChinh : GiaoDien.MauLoi;
 
         nutThanhToan.Enabled = hd.TrangThai == "UNPAID";
-        nutHuyHoaDon.Enabled = hd.TrangThai != "CANCELLED";
+        nutHuyHoaDon.Enabled = hd.TrangThai == "UNPAID";
         nutXuatPDF.Enabled = true;
 
         TaiChiTietHoaDon(hd.MaHoaDon);
+        lblThongTinChon.Text += " · NV: " + hd.TenNhanVien;
     }
 
     private void BoChonHoaDon()
@@ -374,8 +412,8 @@ public sealed class QuanLyHoaDonForm : Form
                 dong.SubItems.Add(ct.TenHangVe);
                 dong.SubItems.Add(ct.TenHanhKhach);
                 dong.SubItems.Add(ct.SoGiayTo);
-                dong.SubItems.Add(ct.DonGia.ToString("N0"));
-                dong.SubItems.Add(ct.ThanhTien.ToString("N0"));
+                dong.SubItems.Add(ct.DonGia.ToString("N2"));
+                dong.SubItems.Add(ct.ThanhTien.ToString("N2"));
 
                 dong.Tag = ct;
                 danhSachChiTiet.Items.Add(dong);
@@ -389,6 +427,7 @@ public sealed class QuanLyHoaDonForm : Form
         finally
         {
             danhSachChiTiet.EndUpdate();
+            GiaoDien.CanCotDanhSach(danhSachChiTiet);
         }
     }
 
@@ -397,14 +436,14 @@ public sealed class QuanLyHoaDonForm : Form
         if (hoaDonDangChon == null) return;
 
         var xacNhan = MessageBox.Show(this,
-            $"Xác nhận thanh toán cho Hóa đơn #{hoaDonDangChon.MaHoaDon}?\nTổng số tiền: {hoaDonDangChon.TongTien:N0} VNĐ\nTrạng thái sẽ chuyển sang PAID và doanh thu được ghi nhận.",
+            $"Xác nhận thanh toán cho Hóa đơn #{hoaDonDangChon.MaHoaDon}?\nTổng số tiền: {hoaDonDangChon.TongTien:N2} VNĐ\nTrạng thái sẽ chuyển sang PAID và doanh thu được ghi nhận.",
             "Xác nhận thanh toán", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
         if (xacNhan != DialogResult.Yes) return;
 
         try
         {
-            string? loi = bus.ThanhToanHoaDon(hoaDonDangChon.MaHoaDon);
+            string? loi = bus.ThanhToanHoaDon(hoaDonDangChon.MaHoaDon, hoaDonDangChon.TongTien);
             if (loi != null)
             {
                 MessageBox.Show(this, loi, "Lỗi thanh toán", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -452,8 +491,8 @@ public sealed class QuanLyHoaDonForm : Form
     {
         using var sfd = new SaveFileDialog
         {
-            Filter = "Tệp Excel CSV (*.csv)|*.csv",
-            FileName = $"DanhSachHoaDon_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+            Filter = "Excel 97–2003 (*.xls)|*.xls",
+            FileName = $"DanhSachHoaDon_{DateTime.Now:yyyyMMdd_HHmmss}.xls"
         };
         if (sfd.ShowDialog(this) == DialogResult.OK)
         {

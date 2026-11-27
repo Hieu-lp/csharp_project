@@ -1,6 +1,7 @@
 using FlightBooking.DTO;
 using System.Collections;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace FlightBooking.BUS;
 
@@ -40,7 +41,7 @@ public static class TimKiemArrayList
                 }
                 else
                 {
-                    string phepNoi = dieuKien.PhepNoi.ToUpperInvariant();
+                    string phepNoi = dieuKien.PhepNoi.Trim().ToUpperInvariant();
                     if (phepNoi == "AND")
                         khopDong = khopDong && khopDieuKien;
                     else if (phepNoi == "OR")
@@ -184,7 +185,7 @@ public static class TimKiemArrayList
                     return ve.TenHangVe;
                 case "PRICE":
                 case "GIAVE":
-                    return ve.GiaVe;
+                    return ve.CoGiaLichSu ? ve.GiaVe : null;
                 case "STATUS":
                 case "TRANGTHAI":
                     return ve.TrangThai;
@@ -203,6 +204,15 @@ public static class TimKiemArrayList
                 case "BOOKINGID":
                 case "MADATVE":
                     return ve.MaDatVe;
+                case "ISSUEDAT":
+                case "NGAYPHATHANH":
+                    return ve.NgayPhatHanh;
+                case "DEPARTUREDATE":
+                case "NGAYKHOIHANH":
+                    return ve.NgayKhoiHanh;
+                case "INVOICESTATUS":
+                case "TRANGTHAIHOADON":
+                    return ve.TrangThaiHoaDon;
                 default:
                     throw new ArgumentException($"Không có trường TICKET tên '{truong}'.", nameof(truong));
             }
@@ -277,25 +287,30 @@ public static class TimKiemArrayList
         if (giaTriThuc is null) return false;
 
         int ketQuaSoSanh;
-        switch (giaTriThuc)
+        if (giaTriThuc is int || giaTriThuc is decimal)
         {
-            case int so when int.TryParse(chuoiCanSoSanh, NumberStyles.Integer, CultureInfo.InvariantCulture, out int soCanSoSanh):
-                ketQuaSoSanh = so.CompareTo(soCanSoSanh);
-                break;
-            case decimal soTien when decimal.TryParse(chuoiCanSoSanh, NumberStyles.Number, CultureInfo.CurrentCulture, out decimal tienCanSoSanh):
-                ketQuaSoSanh = soTien.CompareTo(tienCanSoSanh);
-                break;
-            case decimal soTien when decimal.TryParse(chuoiCanSoSanh, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal tienQuocTe):
-                ketQuaSoSanh = soTien.CompareTo(tienQuocTe);
-                break;
-            case DateTime ngay when DateTime.TryParse(chuoiCanSoSanh, CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime ngayCanSoSanh):
-                ketQuaSoSanh = ngay.CompareTo(ngayCanSoSanh);
-                break;
-            default:
-                ketQuaSoSanh = string.Compare(Convert.ToString(giaTriThuc, CultureInfo.CurrentCulture),
-                    chuoiCanSoSanh, StringComparison.OrdinalIgnoreCase);
-                break;
+            string chuoi = chuoiCanSoSanh.Trim();
+            if (!Regex.IsMatch(chuoi, @"^[+-]?(?:[0-9]+|[0-9]{1,3}(?:\.[0-9]{3})+)(?:,[0-9]+)?$") ||
+                !decimal.TryParse(chuoi.Replace(".", "").Replace(',', '.'), NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out decimal so))
+                throw new ArgumentException("Nhập số theo định dạng Việt Nam, ví dụ 1.000,50. Không so sánh số bằng chuỗi.");
+            ketQuaSoSanh = Convert.ToDecimal(giaTriThuc, CultureInfo.InvariantCulture).CompareTo(so);
         }
+        else if (giaTriThuc is DateTime ngay)
+        {
+            if (DateTime.TryParseExact(chuoiCanSoSanh.Trim(), ["dd/MM/yyyy", "yyyy-MM-dd"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var ngayLoc))
+                ketQuaSoSanh = ngay.Date.CompareTo(ngayLoc.Date);
+            else if (DateTime.TryParseExact(chuoiCanSoSanh.Trim(), ["dd/MM/yyyy HH:mm", "dd/MM/yyyy HH:mm:ss", "yyyy-MM-dd HH:mm:ss", "O"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var thoiDiemLoc))
+                ketQuaSoSanh = ngay.CompareTo(thoiDiemLoc);
+            else throw new ArgumentException("Ngày tìm kiếm phải có dạng dd/MM/yyyy hoặc yyyy-MM-dd; giờ nếu có dạng HH:mm:ss.");
+        }
+        else if (giaTriThuc is DateOnly ngayDon)
+        {
+            if (!DateOnly.TryParseExact(chuoiCanSoSanh.Trim(), ["dd/MM/yyyy", "yyyy-MM-dd"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var ngayLoc))
+                throw new ArgumentException("Ngày tìm kiếm phải có dạng dd/MM/yyyy hoặc yyyy-MM-dd.");
+            ketQuaSoSanh = ngayDon.CompareTo(ngayLoc);
+        }
+        else
+            ketQuaSoSanh = string.Compare(Convert.ToString(giaTriThuc, CultureInfo.CurrentCulture), chuoiCanSoSanh, StringComparison.OrdinalIgnoreCase);
 
         return phepSoSanh switch
         {

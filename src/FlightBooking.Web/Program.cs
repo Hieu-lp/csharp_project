@@ -1,12 +1,16 @@
 using System.Threading.RateLimiting;
 using FlightBooking.BUS;
+using FlightBooking.DAO;
 using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
-builder.Services.AddSingleton(new DatVeBUS(builder.Configuration.GetConnectionString("FlightBookingDB") ?? ""));
+// Giữ ưu tiên cấu hình ASP.NET (kể cả giá trị rỗng tường minh); chỉ fallback
+// sang cấu hình MyConnection khi key chưa được cấu hình.
+builder.Services.AddSingleton(new DatVeBUS(builder.Configuration.GetConnectionString("FlightBookingDB")
+    ?? MyConnection.DocChuoiKetNoi() ?? ""));
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {

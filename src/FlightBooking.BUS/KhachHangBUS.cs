@@ -44,6 +44,18 @@ public class KhachHangBUS
         return null;
     }
 
+    public int NhapKhachHang(IReadOnlyList<KhachHangDTO> danhSach)
+    {
+        if (danhSach.Count == 0) throw new ArgumentException("Không có khách hàng để nhập.");
+        foreach (var khach in danhSach)
+        {
+            ChuanHoaKhachHang(khach);
+            string? loi = KiemTraKhachHang(khach);
+            if (loi is not null) throw new ArgumentException(loi);
+        }
+        return dao.NhapKhachHang(danhSach);
+    }
+
     public string? SuaKhachHang(KhachHangDTO khachHang)
     {
         if (khachHang.MaKhachHang <= 0) return "Mã khách hàng không hợp lệ.";
@@ -107,7 +119,7 @@ public class KhachHangBUS
     }
 
 
-    private static string? KiemTraKhachHang(KhachHangDTO khachHang)
+    public static string? KiemTraKhachHang(KhachHangDTO khachHang)
     {
         if (string.IsNullOrWhiteSpace(khachHang.HoTen)) return "Họ tên không được để trống.";
         if (khachHang.HoTen.Length > 100) return "Họ tên không được dài quá 100 ký tự.";

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using FlightBooking.BUS;
 using FlightBooking.DTO;
 
@@ -12,6 +12,7 @@ public sealed class QuanLyVeForm : Form
 {
     private readonly VeMayBayBUS bus = new();
     private ArrayList danhSachGoc = new();
+    private readonly BoLocNangCao locNangCao = new(["Mã vé|MaVe", "Mã Booking|MaDatVe", "Hành khách|TenHanhKhach", "Giấy tờ|SoGiayTo", "Chuyến bay|MaChuyenBay", "Hạng vé|TenHangVe", "Ghế|SoGhe", "Ngày bay|NgayKhoiHanh", "Giá vé|GiaVe", "Trạng thái vé|TrangThai"]);
 
     // Các ô hiển thị thông tin chi tiết vé được chọn
     private readonly TextBox oMaVe = TaoONhap(chiDoc: true);
@@ -43,7 +44,7 @@ public sealed class QuanLyVeForm : Form
     private readonly Button nutTimKiem = TaoNut("Tìm kiếm");
     private readonly Button nutTaiLai = TaoNut("Tải lại");
     private readonly Button nutXuatExcel = TaoNut("Xuất Excel");
-    private readonly Button nutHuyVe = TaoNut("Hủy vé", canhBao: true);
+    private readonly Button nutHuyVe = TaoNut("Hủy đơn chứa vé", canhBao: true);
     private readonly Button nutLamTrong = TaoNut("Bỏ chọn");
 
     public QuanLyVeForm()
@@ -92,7 +93,19 @@ public sealed class QuanLyVeForm : Form
             Margin = new Padding(3, 0, 3, 14)
         };
         khungChinh.Controls.Add(tieuDe, 0, 0);
-        khungChinh.Controls.Add(TaoVungTimKiem(), 0, 1);
+        var vungTim = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, RowCount = 2 };
+        vungTim.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        vungTim.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        vungTim.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        vungTim.Controls.Add(TaoVungTimKiem(), 0, 0);
+        var nutNangCao = new CheckBox { Text = "Tìm kiếm nâng cao", AutoSize = true };
+        var khungNangCao = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, RowCount = 2 };
+        khungNangCao.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        locNangCao.Visible = false;
+        nutNangCao.CheckedChanged += (_, _) => locNangCao.Visible = nutNangCao.Checked;
+        khungNangCao.Controls.AddRange([nutNangCao, locNangCao]);
+        vungTim.Controls.Add(khungNangCao, 0, 1);
+        khungChinh.Controls.Add(vungTim, 0, 1);
 
         var vungChiTiet = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Margin = Padding.Empty };
         vungChiTiet.Controls.Add(TaoTruongChiTiet());
@@ -138,6 +151,7 @@ public sealed class QuanLyVeForm : Form
         cboTrangThai.Width = 200;
         vung.Controls.Add(cboTrangThai);
 
+        vung.Controls.Add(GiaoDien.TaoNut("Xóa tìm kiếm", () => { oTimKiem.Clear(); cboTrangThai.SelectedIndex=0;locNangCao.XoaDieuKien();ThucHienTimKiem();return Task.CompletedTask; }));
         vung.Controls.Add(nutTimKiem);
         vung.Controls.Add(nutTaiLai);
         vung.Controls.Add(nutXuatExcel);
@@ -188,6 +202,23 @@ public sealed class QuanLyVeForm : Form
             Margin = new Padding(0, 0, 0, 8)
         };
 
+        vung.Controls.Add(GiaoDien.TaoNut("Đặt vé tại quầy", () =>
+        {
+            using var form = new DatVeTaiQuayForm();
+            if (form.ShowDialog(this) == DialogResult.OK) TaiDanhSach();
+            return Task.CompletedTask;
+        }, true));
+        vung.Controls.Add(GiaoDien.TaoNut("Sửa hành khách", () => { SuaHanhKhach(); return Task.CompletedTask; }));
+        vung.Controls.Add(GiaoDien.TaoNut("Đổi ghế", () =>
+        {
+            if(danhSach.SelectedItems.Count==0 || danhSach.SelectedItems[0].Tag is not VeMayBayDTO ve)return Task.CompletedTask;
+            using var f=new Form{Text="Đổi ghế cùng chuyến",Size=new Size(420,210),StartPosition=FormStartPosition.CenterParent};
+            var chon=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Dock=DockStyle.Top};
+            try{chon.Items.AddRange(new DatVeBUS().DocGheTrong(ve.MaChuyenBay,1).ToArray());}catch(Exception e){MessageBox.Show(this,e.Message);return Task.CompletedTask;}
+            var luu=GiaoDien.TaoNut("Lưu đổi ghế",()=>{try{new DatVeBUS().DoiGheVe(ve.MaVe,ve.SoGhe,chon.Text);f.DialogResult=DialogResult.OK;}catch(Exception e){MessageBox.Show(f,e.Message);}return Task.CompletedTask;},true);
+            luu.Dock=DockStyle.Bottom;f.Controls.Add(chon);f.Controls.Add(luu);
+            if(f.ShowDialog(this)==DialogResult.OK)TaiDanhSach();return Task.CompletedTask;
+        }));
         vung.Controls.Add(nutHuyVe);
         vung.Controls.Add(nutLamTrong);
         return vung;
@@ -214,6 +245,7 @@ public sealed class QuanLyVeForm : Form
 
     private void GanSuKien()
     {
+        locNangCao.YeuCauTimKiem += (_,_) => ThucHienTimKiem();
         nutTimKiem.Click += (_, _) => ThucHienTimKiem();
         oTimKiem.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; ThucHienTimKiem(); } };
         cboTrangThai.SelectedIndexChanged += (_, _) => ThucHienTimKiem();
@@ -228,7 +260,7 @@ public sealed class QuanLyVeForm : Form
                 XoaChiTiet();
         };
 
-        nutHuyVe.Click += (_, _) => ThucHienHuyVe();
+        nutHuyVe.Click += (_, _) => ThucHienHuyDonChuaVe();
         nutXuatExcel.Click += (_, _) => ThucHienXuatExcel();
     }
 
@@ -259,9 +291,19 @@ public sealed class QuanLyVeForm : Form
             _ => "TAT_CA"
         };
 
-        var ketQua = bus.TimKiemVe(danhSachGoc, tuKhoa, trangThai);
-        HienThiDanhSach(ketQua);
-        thongBao.Text = $"Tìm thấy {ketQua.Count} vé phù hợp.";
+        try
+        {
+            var ketQua = bus.TimKiemVe(danhSachGoc, tuKhoa, trangThai);
+            if (locNangCao.Visible) ketQua = bus.LocDanhSach(ketQua, locNangCao.DocDieuKien());
+            HienThiDanhSach(ketQua);
+            thongBao.ForeColor = GiaoDien.MauChuPhu;
+            thongBao.Text = $"Tìm thấy {ketQua.Count} vé phù hợp.";
+        }
+        catch (ArgumentException loi)
+        {
+            thongBao.ForeColor = Color.Firebrick;
+            thongBao.Text = loi.Message;
+        }
     }
 
     private void HienThiDanhSach(IEnumerable nguon)
@@ -280,7 +322,7 @@ public sealed class QuanLyVeForm : Form
                 dong.SubItems.Add(tuyen);
                 dong.SubItems.Add(ve.SoGhe);
                 dong.SubItems.Add(ve.TenHangVe);
-                dong.SubItems.Add(ve.GiaVe.ToString("N0"));
+                dong.SubItems.Add(ve.CoGiaLichSu ? ve.GiaVe.ToString("N2") : "Chưa có chứng từ");
                 dong.SubItems.Add(string.IsNullOrEmpty(ve.TenHanhKhach) ? "(Chưa rõ)" : ve.TenHanhKhach);
                 dong.SubItems.Add(ve.TrangThai == "ISSUED" ? "Hiệu lực" : "Đã hủy");
                 dong.SubItems.Add(ve.NgayPhatHanh.ToString("dd/MM/yyyy HH:mm"));
@@ -296,7 +338,33 @@ public sealed class QuanLyVeForm : Form
         {
             danhSach.EndUpdate();
         }
+        GiaoDien.CanCotDanhSach(danhSach);
         XoaChiTiet();
+    }
+
+    private void SuaHanhKhach()
+    {
+        if (danhSach.SelectedItems.Count == 0 || danhSach.SelectedItems[0].Tag is not VeMayBayDTO ve)
+        { MessageBox.Show(this, "Chọn vé cần sửa."); return; }
+        using var form = new Form { Text = "Sửa hành khách", Size = new Size(580, 330), StartPosition = FormStartPosition.CenterParent, Font = Font, MinimizeBox = false, MaximizeBox = false };
+        var bang = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6, Padding = new Padding(18) };
+        var ten = new TextBox { Text = ve.TenHanhKhach, MaxLength = 100, Dock = DockStyle.Fill, AccessibleName = "Họ tên hành khách" };
+        var giay = new TextBox { Text = ve.SoGiayTo, MaxLength = 50, Dock = DockStyle.Fill, AccessibleName = "CCCD hoặc hộ chiếu" };
+        bang.Controls.Add(GiaoDien.TaoNhan("Chỉ sửa đơn UNPAID trước giờ bay. Khứ hồi: áp dụng cho cùng hành khách ở cả hai lượt.", 9));
+        bang.Controls.Add(GiaoDien.TaoNhan("Họ tên hành khách")); bang.Controls.Add(ten);
+        bang.Controls.Add(GiaoDien.TaoNhan("CCCD / hộ chiếu")); bang.Controls.Add(giay);
+        var nut = GiaoDien.TaoNut("Lưu thông tin", () =>
+        {
+            try
+            {
+                bus.SuaHanhKhach(ve.MaVe, new ThongTinHanhKhach { FullName = ten.Text, IdCard = giay.Text });
+                form.DialogResult = DialogResult.OK;
+            }
+            catch (Exception loi) { MessageBox.Show(form, loi.Message, "Chưa sửa được vé"); }
+            return Task.CompletedTask;
+        }, true);
+        bang.Controls.Add(nut); form.Controls.Add(bang); form.AcceptButton = nut;
+        if (form.ShowDialog(this) == DialogResult.OK) TaiDanhSach();
     }
 
     private void HienThiChiTiet(VeMayBayDTO ve)
@@ -306,14 +374,14 @@ public sealed class QuanLyVeForm : Form
         oTuyenBay.Text = !string.IsNullOrEmpty(ve.SanBayDi) ? $"{ve.SanBayDi} → {ve.SanBayDen}" : $"Chuyến #{ve.MaChuyenBay}";
         oSoGhe.Text = ve.SoGhe;
         oHangVe.Text = ve.TenHangVe;
-        oGiaVe.Text = ve.GiaVe.ToString("N0") + " VNĐ";
+        oGiaVe.Text = ve.CoGiaLichSu ? ve.GiaVe.ToString("N2") + " VNĐ" : "Chưa có chứng từ giá lịch sử";
         oHanhKhach.Text = ve.TenHanhKhach;
         oSoGiayTo.Text = ve.SoGiayTo;
         oTrangThai.Text = ve.TrangThai == "ISSUED" ? "ISSUED (Có hiệu lực)" : "CANCELLED (Đã hủy)";
         oTrangThai.ForeColor = ve.TrangThai == "ISSUED" ? Color.Green : GiaoDien.MauLoi;
         oNgayPhatHanh.Text = ve.NgayPhatHanh.ToString("dd/MM/yyyy HH:mm:ss");
 
-        nutHuyVe.Enabled = ve.TrangThai == "ISSUED";
+        nutHuyVe.Enabled = ve.TrangThai == "ISSUED" && ve.TrangThaiHoaDon == "UNPAID" && ve.MaDatVe.HasValue;
     }
 
     private void XoaChiTiet()
@@ -332,7 +400,7 @@ public sealed class QuanLyVeForm : Form
         nutHuyVe.Enabled = false;
     }
 
-    private void ThucHienHuyVe()
+    private void ThucHienHuyDonChuaVe()
     {
         if (danhSach.SelectedItems.Count == 0 || danhSach.SelectedItems[0].Tag is not VeMayBayDTO ve)
         {
@@ -347,21 +415,21 @@ public sealed class QuanLyVeForm : Form
         }
 
         var xacNhan = MessageBox.Show(this,
-            $"Bạn có chắc chắn muốn hủy vé #{ve.MaVe} (Ghế {ve.SoGhe} - Khách {ve.TenHanhKhach})?\nGhế sẽ được hoàn trả lại cho chuyến bay.",
+            $"Hủy toàn bộ đơn #{ve.MaDatVe} chứa vé #{ve.MaVe}?\nChỉ áp dụng đơn UNPAID trước giờ bay. Tất cả vé thuộc đơn sẽ bị hủy, hoàn ghế và lượt mã giảm giá đúng một lần.",
             "Xác nhận hủy vé", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
 
         if (xacNhan != DialogResult.Yes) return;
 
         try
         {
-            string? loi = bus.HuyVe(ve.MaVe);
+            string? loi = bus.HuyDonChuaVe(ve.MaVe);
             if (loi != null)
             {
                 MessageBox.Show(this, loi, "Lỗi hủy vé", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            MessageBox.Show(this, $"Đã hủy thành công vé #{ve.MaVe}.", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, $"Đã hủy đơn chứa vé #{ve.MaVe}.", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
             TaiDanhSach();
         }
         catch (Exception ex)
@@ -374,8 +442,8 @@ public sealed class QuanLyVeForm : Form
     {
         using var sfd = new SaveFileDialog
         {
-            Filter = "Tệp Excel CSV (*.csv)|*.csv",
-            FileName = $"DanhSachVe_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+            Filter = "Excel 97–2003 (*.xls)|*.xls",
+            FileName = $"DanhSachVe_{DateTime.Now:yyyyMMdd_HHmmss}.xls"
         };
         if (sfd.ShowDialog(this) == DialogResult.OK)
         {

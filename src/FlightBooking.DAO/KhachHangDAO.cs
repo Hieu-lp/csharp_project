@@ -105,6 +105,32 @@ public class KhachHangDAO
         return lenhSQL.ExecuteNonQuery() == 1;
     }
 
+    // Nhập mới cả lô trong một giao dịch; gặp trùng sẽ không lưu dòng nào.
+    public int NhapKhachHang(IReadOnlyList<KhachHangDTO> danhSach)
+    {
+        using var ketNoi = MyConnection.CreateConnection(); ketNoi.Open();
+        using var giaoDich = ketNoi.BeginTransaction(IsolationLevel.Serializable);
+        int soDong = 0;
+        foreach (var khach in danhSach)
+        {
+            using var kiemTra = new SqlCommand("""
+                SELECT COUNT(*) FROM dbo.CUSTOMER WITH(UPDLOCK,HOLDLOCK)
+                WHERE phone=@Phone OR email=@Email OR (@PassportNumber IS NOT NULL AND id_passport_number=@PassportNumber)
+                """, ketNoi, giaoDich);
+            ThemThamSoKhachHang(kiemTra, khach);
+            if (Convert.ToInt32(kiemTra.ExecuteScalar()) > 0)
+                throw new InvalidOperationException("Khách hàng bị trùng điện thoại, email hoặc giấy tờ. Không nhập dòng nào; hãy kiểm tra lại file.");
+            using var them = new SqlCommand("""
+                INSERT dbo.CUSTOMER(full_name,phone,email,date_of_birth,gender,id_passport_number)
+                VALUES(@FullName,@Phone,@Email,@DateOfBirth,@Gender,@PassportNumber)
+                """, ketNoi, giaoDich);
+            ThemThamSoKhachHang(them, khach);
+            if (them.ExecuteNonQuery() != 1) throw new InvalidOperationException("Nhập thất bại; toàn bộ lô đã được hoàn tác.");
+            soDong++;
+        }
+        giaoDich.Commit(); return soDong;
+    }
+
     // Tạo tham số có kiểu/kích thước khớp schema, tránh nối dữ liệu vào SQL.
     private static void ThemThamSoKhachHang(SqlCommand lenhSQL, KhachHangDTO khachHang)
     {

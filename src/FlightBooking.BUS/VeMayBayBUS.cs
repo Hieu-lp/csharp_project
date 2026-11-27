@@ -1,4 +1,4 @@
-using FlightBooking.DAO;
+﻿using FlightBooking.DAO;
 using FlightBooking.DTO;
 using System.Collections;
 
@@ -10,6 +10,9 @@ namespace FlightBooking.BUS;
 public class VeMayBayBUS
 {
     private readonly VeMayBayDAO dao = new();
+
+    public void SuaHanhKhach(int maVe, ThongTinHanhKhach thongTin)
+        => new DatVeBUS().SuaThongTinHanhKhach(maVe, thongTin);
 
     public ArrayList DocDSVe()
     {
@@ -38,48 +41,50 @@ public class VeMayBayBUS
         return ketQua;
     }
 
-    public string? HuyVe(int maVe)
+    public string? HuyDonChuaVe(int maVe)
     {
         if (maVe <= 0) return "Mã vé không hợp lệ.";
         var ve = dao.DocVeTheoMa(maVe);
         if (ve == null) return "Không tìm thấy vé trong hệ thống.";
         if (ve.TrangThai == "CANCELLED") return "Vé này đã bị hủy trước đó.";
+        if (ve.TrangThaiHoaDon != "UNPAID") return "Chỉ hủy toàn bộ đơn UNPAID. Không hủy vé lẻ hoặc tự hoàn tiền đơn PAID.";
 
-        bool thanhCong = dao.HuyVe(maVe);
+        bool thanhCong = dao.HuyDonChuaVe(maVe);
         return thanhCong ? null : "Hủy vé thất bại. Vui lòng thử lại.";
     }
 
     public ArrayList TimKiemVe(ArrayList danhSach, string tuKhoa, string trangThai = "TAT_CA")
     {
         var ketQua = new ArrayList();
-        string key = (tuKhoa ?? "").Trim();
-        string tt = (trangThai ?? "TAT_CA").Trim().ToUpperInvariant();
+        string chuoiTim = (tuKhoa ?? "").Trim();
+        string trangThaiLoc = (trangThai ?? "TAT_CA").Trim().ToUpperInvariant();
 
-        foreach (object item in danhSach)
+        foreach (object phanTu in danhSach)
         {
-            if (item is not VeMayBayDTO ve) continue;
+            if (phanTu is not VeMayBayDTO ve) continue;
 
-            bool khopTrangThai = tt == "TAT_CA" ||
-                (tt == "ISSUED" && ve.TrangThai.Equals("ISSUED", StringComparison.OrdinalIgnoreCase)) ||
-                (tt == "CANCELLED" && ve.TrangThai.Equals("CANCELLED", StringComparison.OrdinalIgnoreCase));
+            bool khopTrangThai = trangThaiLoc == "TAT_CA" ||
+                (trangThaiLoc == "ISSUED" && ve.TrangThai.Equals("ISSUED", StringComparison.OrdinalIgnoreCase)) ||
+                (trangThaiLoc == "CANCELLED" && ve.TrangThai.Equals("CANCELLED", StringComparison.OrdinalIgnoreCase));
 
             if (!khopTrangThai) continue;
 
-            if (string.IsNullOrEmpty(key))
+            if (string.IsNullOrEmpty(chuoiTim))
             {
                 ketQua.Add(ve);
                 continue;
             }
 
             bool khopTuKhoa =
-                ve.MaVe.ToString().Contains(key, StringComparison.OrdinalIgnoreCase) ||
-                ve.SoGhe.Contains(key, StringComparison.OrdinalIgnoreCase) ||
-                ve.TenHanhKhach.Contains(key, StringComparison.OrdinalIgnoreCase) ||
-                ve.SoGiayTo.Contains(key, StringComparison.OrdinalIgnoreCase) ||
-                ve.SanBayDi.Contains(key, StringComparison.OrdinalIgnoreCase) ||
-                ve.SanBayDen.Contains(key, StringComparison.OrdinalIgnoreCase) ||
-                ve.TenHangVe.Contains(key, StringComparison.OrdinalIgnoreCase) ||
-                ve.MaChuyenBay.ToString().Contains(key, StringComparison.OrdinalIgnoreCase);
+                ve.MaVe.ToString().Contains(chuoiTim, StringComparison.OrdinalIgnoreCase) ||
+                (ve.MaDatVe?.ToString().Contains(chuoiTim, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                ve.SoGhe.Contains(chuoiTim, StringComparison.OrdinalIgnoreCase) ||
+                ve.TenHanhKhach.Contains(chuoiTim, StringComparison.OrdinalIgnoreCase) ||
+                ve.SoGiayTo.Contains(chuoiTim, StringComparison.OrdinalIgnoreCase) ||
+                ve.SanBayDi.Contains(chuoiTim, StringComparison.OrdinalIgnoreCase) ||
+                ve.SanBayDen.Contains(chuoiTim, StringComparison.OrdinalIgnoreCase) ||
+                ve.TenHangVe.Contains(chuoiTim, StringComparison.OrdinalIgnoreCase) ||
+                ve.MaChuyenBay.ToString().Contains(chuoiTim, StringComparison.OrdinalIgnoreCase);
 
             if (khopTuKhoa)
                 ketQua.Add(ve);
